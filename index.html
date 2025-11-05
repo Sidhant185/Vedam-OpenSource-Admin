@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Vedam Open Source - Admin Dashboard</title>
+    <link
+      rel="icon"
+      href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💻</text></svg>"
+    />
+    <link rel="stylesheet" href="styles.css" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"
+    />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  </head>
+  <body>
+    <!-- Login Screen -->
+    <div id="loginScreen" class="login-screen">
+      <div class="login-container">
+        <div class="login-header">
+          <h1><i class="fas fa-code"></i> Vedam Open Source</h1>
+          <p>Admin Dashboard</p>
+        </div>
+        <form id="loginForm" class="login-form">
+          <div class="form-group">
+            <label for="email">Email</label>
+            <input type="email" id="email" name="email" required />
+          </div>
+          <div class="form-group">
+            <label for="password">Password</label>
+            <input type="password" id="password" name="password" required />
+          </div>
+          <button type="submit" class="login-btn">
+            <i class="fas fa-sign-in-alt"></i> Login
+          </button>
+          <div id="loginError" class="error-message"></div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Main Dashboard -->
+    <div id="dashboard" class="dashboard" style="display: none">
+      <!-- Header -->
+      <header class="header">
+        <div class="header-left">
+          <button id="sidebarToggle" class="sidebar-toggle">
+            <i class="fas fa-bars"></i>
+          </button>
+          <h1><i class="fas fa-code"></i> Vedam Open Source Admin</h1>
+        </div>
+        <div class="header-right">
+          <div class="user-info">
+            <span id="adminEmail"></span>
+            <button id="logoutBtn" class="logout-btn">
+              <i class="fas fa-sign-out-alt"></i> Logout
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <!-- Sidebar -->
+      <nav id="sidebar" class="sidebar">
+        <ul class="nav-menu">
+          <li class="nav-item active" data-page="dashboard">
+            <i class="fas fa-tachometer-alt"></i>
+            <span>Dashboard</span>
+          </li>
+          <li class="nav-item" data-page="members">
+            <i class="fas fa-users"></i>
+            <span>Members</span>
+          </li>
+          <li class="nav-item" data-page="analytics">
+            <i class="fas fa-chart-bar"></i>
+            <span>Analytics</span>
+          </li>
+          <li class="nav-item" data-page="settings">
+            <i class="fas fa-cog"></i>
+            <span>Settings</span>
+          </li>
+        </ul>
+      </nav>
+
+      <!-- Main Content -->
+      <main class="main-content">
+        <!-- Dashboard Page -->
+        <div id="dashboardPage" class="page active">
+          <div class="page-header">
+            <h2>Dashboard Overview</h2>
+            <p>Welcome to the Vedam Open Source Admin Dashboard</p>
+          </div>
+
+          <div class="stats-grid">
+            <div class="stat-card">
+              <div class="stat-icon">
+                <i class="fas fa-users"></i>
+              </div>
+              <div class="stat-content">
+                <h3 id="totalMembers">0</h3>
+                <p>Total Members</p>
+              </div>
+            </div>
+            <div class="stat-card">
+              <div
+                class="stat-icon"
+                style="
+                  background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%);
+                "
+              >
+                <i class="fas fa-code-branch"></i>
+              </div>
+              <div class="stat-content">
+                <h3 id="dashboardTotalRepos">0</h3>
+                <p>Total Repositories</p>
+              </div>
+            </div>
+            <div class="stat-card">
+              <div
+                class="stat-icon"
+                style="
+                  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+                "
+              >
+                <i class="fas fa-star"></i>
+              </div>
+              <div class="stat-content">
+                <h3 id="dashboardTotalStars">0</h3>
+                <p>Total Stars</p>
+              </div>
+            </div>
+            <div class="stat-card">
+              <div
+                class="stat-icon"
+                style="
+                  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+                "
+              >
+                <i class="fas fa-code-pull-request"></i>
+              </div>
+              <div class="stat-content">
+                <h3 id="dashboardTotalPRs">0</h3>
+                <p>Pull Requests</p>
+              </div>
+            </div>
+            <div class="stat-card">
+              <div
+                class="stat-icon"
+                style="
+                  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+                "
+              >
+                <i class="fas fa-code-commit"></i>
+              </div>
+              <div class="stat-content">
+                <h3 id="dashboardTotalCommits">0</h3>
+                <p>Commits</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="charts-grid">
+            <div class="chart-card">
+              <h3>Pull Requests Trends</h3>
+              <div style="height: 300px; position: relative">
+                <canvas id="prTrendsChart"></canvas>
+              </div>
+            </div>
+          </div>
+
+          <div class="dashboard-lists-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 1.5rem; margin-top: 2rem;">
+            <div class="chart-card">
+              <h3>Top Committers</h3>
+              <div id="dashboardTopCommitters" class="contributors-list" style="max-height: 400px; overflow-y: auto;">
+                <!-- Top committers will be loaded here -->
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Members Page -->
+        <div id="membersPage" class="page">
+          <div class="page-header">
+            <h2>Member Management</h2>
+            <div class="page-actions">
+              <button id="refreshGitHubData" class="btn btn-primary">
+                <i class="fas fa-sync-alt"></i> Refresh GitHub Data
+              </button>
+              <button id="exportMembers" class="btn btn-secondary">
+                <i class="fas fa-download"></i> Export
+              </button>
+            </div>
+            <div
+              id="refreshProgressWrap"
+              style="
+                display: none;
+                margin-top: 0.75rem;
+                width: 100%;
+                max-width: 420px;
+              "
+            >
+              <div
+                style="
+                  background: #e5e7eb;
+                  height: 8px;
+                  border-radius: 9999px;
+                  overflow: hidden;
+                "
+              >
+                <div
+                  id="refreshProgressBar"
+                  style="height: 8px; width: 0%; background: #667eea"
+                ></div>
+              </div>
+              <div
+                id="refreshProgressText"
+                style="font-size: 0.85rem; color: #64748b; margin-top: 6px"
+              >
+                Refreshing…
+              </div>
+            </div>
+          </div>
+
+          <div class="filters-section">
+            <div class="search-box">
+              <i class="fas fa-search"></i>
+              <input
+                type="text"
+                id="memberSearch"
+                placeholder="Search by name, GitHub username..."
+              />
+              <button
+                id="clearSearch"
+                class="clear-search-btn"
+                style="display: none"
+              >
+                <i class="fas fa-times"></i>
+              </button>
+            </div>
+            <div class="filter-controls">
+              <select id="statusFilter">
+                <option value="">All Status</option>
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+              </select>
+              <select id="prFilter">
+                <option value="">All PRs</option>
+                <option value="has-prs">Has PRs</option>
+                <option value="no-prs">No PRs</option>
+                <option value="high-prs">10+ PRs</option>
+                <option value="medium-prs">5-10 PRs</option>
+                <option value="low-prs">1-5 PRs</option>
+              </select>
+              <select id="sortFilter">
+                <option value="name-asc">Sort: Name A-Z</option>
+                <option value="name-desc">Sort: Name Z-A</option>
+                <option value="prs-desc">Sort: PRs (High-Low)</option>
+                <option value="stars-desc">Sort: Stars (High-Low)</option>
+                <option value="repos-desc">Sort: Repos (High-Low)</option>
+                <option value="joined-desc">Sort: Recently Joined</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="members-stats-summary">
+            <div class="members-stat-item">
+              <i class="fas fa-code-branch"></i>
+              <div>
+                <span class="members-stat-value" id="membersTotalRepos">0</span>
+                <span class="members-stat-label">Total Repos</span>
+              </div>
+            </div>
+            <div class="members-stat-item">
+              <i class="fas fa-star"></i>
+              <div>
+                <span class="members-stat-value" id="membersTotalStars">0</span>
+                <span class="members-stat-label">Total Stars</span>
+              </div>
+            </div>
+            <div class="members-stat-item">
+              <i class="fas fa-code-pull-request"></i>
+              <div>
+                <span class="members-stat-value" id="membersTotalPRs">0</span>
+                <span class="members-stat-label">Pull Requests</span>
+              </div>
+            </div>
+            <div class="members-stat-item">
+              <i class="fas fa-code-commit"></i>
+              <div>
+                <span class="members-stat-value" id="membersTotalCommits"
+                  >0</span
+                >
+                <span class="members-stat-label">Commits</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="members-table-container">
+            <table class="members-table">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>GitHub</th>
+                  <th>Repositories</th>
+                  <th>Stars</th>
+                  <th>Commits</th>
+                  <th>Pull Requests</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="membersTableBody">
+                <!-- Members will be loaded here -->
+              </tbody>
+            </table>
+          </div>
+
+          <div class="pagination">
+            <button id="prevPage" class="btn btn-secondary" disabled>
+              Previous
+            </button>
+            <span id="pageInfo">Page 1 of 1</span>
+            <button id="nextPage" class="btn btn-secondary" disabled>
+              Next
+            </button>
+          </div>
+        </div>
+
+        <!-- Analytics Page -->
+        <div id="analyticsPage" class="page">
+          <div class="page-header">
+            <h2>Analytics & Insights</h2>
+            <p>
+              Comprehensive analytics and insights about member activity and
+              GitHub engagement
+            </p>
+          </div>
+
+          <div class="analytics-grid">
+            <div class="analytics-card">
+              <h3>Repository Statistics</h3>
+              <div style="height: 300px; position: relative">
+                <canvas id="repoChart"></canvas>
+              </div>
+            </div>
+            <div class="analytics-card">
+              <h3>Language Distribution</h3>
+              <div style="height: 300px; position: relative">
+                <canvas id="languageChart"></canvas>
+              </div>
+            </div>
+            <div class="analytics-card">
+              <h3>Top Committers</h3>
+              <div id="topCommitters" class="contributors-list">
+                <!-- Top committers will be loaded here -->
+              </div>
+            </div>
+            <div class="analytics-card">
+              <h3>Top PR Creators</h3>
+              <div id="topPRCreators" class="contributors-list">
+                <!-- Top PR creators will be loaded here -->
+              </div>
+            </div>
+            <div class="analytics-card">
+              <h3>Activity Summary</h3>
+              <div class="activity-stats">
+                <div class="activity-item">
+                  <span class="activity-label">Total Repositories:</span>
+                  <span class="activity-value" id="totalRepos">0</span>
+                </div>
+                <div class="activity-item">
+                  <span class="activity-label">Total Stars:</span>
+                  <span class="activity-value" id="totalStars">0</span>
+                </div>
+                <div class="activity-item">
+                  <span class="activity-label">Pull Requests:</span>
+                  <span class="activity-value" id="totalPRs">0</span>
+                </div>
+                <div class="activity-item">
+                  <span class="activity-label">Total Commits:</span>
+                  <span class="activity-value" id="totalCommits">0</span>
+                </div>
+                <div class="activity-item">
+                  <span class="activity-label">Total Issues:</span>
+                  <span class="activity-value" id="totalIssues">0</span>
+                </div>
+                <div class="activity-item">
+                  <span class="activity-label">Average Repos:</span>
+                  <span class="activity-value" id="avgRepos">0</span>
+                </div>
+                <div class="activity-item">
+                  <span class="activity-label">Average Stars:</span>
+                  <span class="activity-value" id="avgStars">0</span>
+                </div>
+              </div>
+            </div>
+            <div class="analytics-card">
+              <h3>Language Statistics</h3>
+              <div id="languageStats" class="language-stats-container">
+                <!-- Language stats will be loaded here -->
+              </div>
+            </div>
+            <div class="analytics-card">
+              <h3>Pull Request Activity</h3>
+              <div style="height: 300px; position: relative">
+                <canvas id="prActivityChart"></canvas>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Settings Page -->
+        <div id="settingsPage" class="page">
+          <div class="page-header">
+            <h2>Settings</h2>
+          </div>
+
+          <div class="settings-sections">
+            <div class="settings-card">
+              <h3>Admin Profile</h3>
+              <div class="form-group">
+                <label>Email</label>
+                <input type="email" id="adminEmailInput" readonly />
+              </div>
+              <div class="form-group">
+                <label>Role</label>
+                <input type="text" value="Super Admin" readonly />
+              </div>
+            </div>
+
+            <div class="settings-card">
+              <h3>System Information</h3>
+              <div class="system-info">
+                <div class="info-item">
+                  <span class="info-label">Firebase Project:</span>
+                  <span class="info-value">vedamopensource</span>
+                </div>
+                <div class="info-item">
+                  <span class="info-label">Database:</span>
+                  <span class="info-value">Firestore</span>
+                </div>
+                <div class="info-item">
+                  <span class="info-label">Last Updated:</span>
+                  <span class="info-value" id="lastUpdated">Loading...</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Member Details Page -->
+        <div id="memberDetailsPage" class="page">
+          <div id="memberDetailsContent">
+            <!-- Member details will be loaded here -->
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="loading-overlay">
+      <div class="loading-spinner">
+        <i class="fas fa-spinner fa-spin"></i>
+        <p>Loading...</p>
+      </div>
+    </div>
+
+    <!-- Firebase Configuration -->
+    <script type="module" src="firebase-config.js"></script>
+    <!-- Main Application (loads all modules) -->
+    <script type="module" src="js/app.js"></script>
+  </body>
+</html>

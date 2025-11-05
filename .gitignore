@@ -1,0 +1,26 @@
+# Environment files
+.env
+.env.local
+
+# Token security - if you commit to Git, uncomment this line:
+# app.js
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Dependencies (if using npm/yarn in future)
+node_modules/
+package-lock.json
+yarn.lock
+
+# Build files
+dist/
+build/
+
