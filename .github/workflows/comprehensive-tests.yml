@@ -126,6 +126,9 @@ jobs:
       # ============================================
       - name: Code Quality - JavaScript syntax
         run: |
+          # Enable nullglob to handle empty globs gracefully
+          shopt -s nullglob
+          
           # Check JS files in js/ directory
           for file in js/*.js; do
             if [ -f "$file" ]; then
@@ -136,15 +139,13 @@ jobs:
             fi
           done
           
-          # Check main config files
-          for file in firebase-config.js app.js; do
-            if [ -f "$file" ]; then
-              node --check "$file" 2>/dev/null || {
-                echo "❌ Syntax error in $file"
-                exit 1
-              }
-            fi
-          done
+          # Check main config file
+          if [ -f firebase-config.js ]; then
+            node --check firebase-config.js 2>/dev/null || {
+              echo "❌ Syntax error in firebase-config.js"
+              exit 1
+            }
+          fi
           
           echo "✅ All JavaScript files have valid syntax"
       

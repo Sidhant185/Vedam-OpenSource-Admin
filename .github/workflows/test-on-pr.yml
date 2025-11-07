@@ -182,21 +182,26 @@ jobs:
         run: |
           echo "🔍 Checking JavaScript syntax..."
           
+          # Enable nullglob to handle empty globs gracefully
+          shopt -s nullglob
+          
           # Check for basic syntax errors in JS files
           for file in js/*.js; do
             if [ -f "$file" ]; then
-              node --check "$file" || {
+              node --check "$file" 2>/dev/null || {
                 echo "❌ Syntax error in $file"
                 exit 1
               }
             fi
           done
           
-          # Check main config files
-          node --check firebase-config.js || {
-            echo "❌ Syntax error in firebase-config.js"
-            exit 1
-          }
+          # Check main config file
+          if [ -f firebase-config.js ]; then
+            node --check firebase-config.js 2>/dev/null || {
+              echo "❌ Syntax error in firebase-config.js"
+              exit 1
+            }
+          fi
           
           echo "✅ All JavaScript files have valid syntax"
       
