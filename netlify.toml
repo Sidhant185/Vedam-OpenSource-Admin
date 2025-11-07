@@ -11,6 +11,35 @@
   # This is expected behavior for our deployment process
   SECRETS_SCAN_SMART_DETECTION_ENABLED = "false"
 
+# ============================================================================
+# REQUIRED ENVIRONMENT VARIABLES
+# ============================================================================
+# These environment variables MUST be set in Netlify Dashboard:
+# Go to: Site Settings → Environment Variables
+#
+# Required Firebase variables (all must be set):
+#   - VITE_FIREBASE_API_KEY
+#   - VITE_FIREBASE_AUTH_DOMAIN
+#   - VITE_FIREBASE_PROJECT_ID
+#   - VITE_FIREBASE_STORAGE_BUCKET
+#   - VITE_FIREBASE_MESSAGING_SENDER_ID
+#   - VITE_FIREBASE_APP_ID
+#   - VITE_FIREBASE_MEASUREMENT_ID
+#
+# Optional variables:
+#   - VITE_GITHUB_TOKEN (optional, but recommended for higher API rate limits)
+#
+# How to get Firebase credentials:
+#   1. Go to Firebase Console: https://console.firebase.google.com/
+#   2. Select your project
+#   3. Go to Project Settings → General
+#   4. Scroll to "Your apps" section
+#   5. Copy the configuration values
+#
+# IMPORTANT: The build will FAIL if required environment variables are missing.
+# The build script validates all required variables before proceeding.
+# ============================================================================
+
 # Branch deploy configuration
 [build.processing]
   skip_processing = false

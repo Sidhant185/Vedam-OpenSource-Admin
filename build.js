@@ -22,21 +22,58 @@ if (!isCI) {
   console.warn('⚠️  Continuing anyway (for testing purposes)...\n');
 }
 
-// Load environment variables
+// Load environment variables (dotenv won't fail if .env doesn't exist)
+// On Netlify, environment variables are set in the dashboard and available via process.env
 require('dotenv').config();
+
+// Required Firebase environment variables
+const requiredEnvVars = [
+  'VITE_FIREBASE_API_KEY',
+  'VITE_FIREBASE_AUTH_DOMAIN',
+  'VITE_FIREBASE_PROJECT_ID',
+  'VITE_FIREBASE_STORAGE_BUCKET',
+  'VITE_FIREBASE_MESSAGING_SENDER_ID',
+  'VITE_FIREBASE_APP_ID',
+  'VITE_FIREBASE_MEASUREMENT_ID'
+];
+
+// Check for missing required environment variables
+const missingVars = requiredEnvVars.filter(varName => !process.env[varName] || process.env[varName].trim() === '');
+
+if (missingVars.length > 0) {
+  console.error('\n❌ ERROR: Missing required environment variables:');
+  missingVars.forEach(varName => {
+    console.error(`   - ${varName}`);
+  });
+  console.error('\n📋 To fix this:');
+  if (isCI) {
+    console.error('   1. Go to Netlify Dashboard → Site Settings → Environment Variables');
+    console.error('   2. Add all required Firebase environment variables');
+    console.error('   3. Redeploy the site');
+  } else {
+    console.error('   1. Create a .env file in the project root');
+    console.error('   2. Add all required Firebase environment variables');
+    console.error('   3. See README.md or SETUP.md for details');
+  }
+  console.error('\n💡 Required variables:');
+  requiredEnvVars.forEach(varName => {
+    console.error(`   - ${varName}`);
+  });
+  process.exit(1);
+}
 
 // Files that need environment variable replacement
 const filesToProcess = [
   {
     file: 'firebase-config.js',
     replacements: {
-      '"VITE_FIREBASE_API_KEY"': process.env.VITE_FIREBASE_API_KEY || '',
-      '"VITE_FIREBASE_AUTH_DOMAIN"': process.env.VITE_FIREBASE_AUTH_DOMAIN || '',
-      '"VITE_FIREBASE_PROJECT_ID"': process.env.VITE_FIREBASE_PROJECT_ID || '',
-      '"VITE_FIREBASE_STORAGE_BUCKET"': process.env.VITE_FIREBASE_STORAGE_BUCKET || '',
-      '"VITE_FIREBASE_MESSAGING_SENDER_ID"': process.env.VITE_FIREBASE_MESSAGING_SENDER_ID || '',
-      '"VITE_FIREBASE_APP_ID"': process.env.VITE_FIREBASE_APP_ID || '',
-      '"VITE_FIREBASE_MEASUREMENT_ID"': process.env.VITE_FIREBASE_MEASUREMENT_ID || '',
+      '"VITE_FIREBASE_API_KEY"': process.env.VITE_FIREBASE_API_KEY,
+      '"VITE_FIREBASE_AUTH_DOMAIN"': process.env.VITE_FIREBASE_AUTH_DOMAIN,
+      '"VITE_FIREBASE_PROJECT_ID"': process.env.VITE_FIREBASE_PROJECT_ID,
+      '"VITE_FIREBASE_STORAGE_BUCKET"': process.env.VITE_FIREBASE_STORAGE_BUCKET,
+      '"VITE_FIREBASE_MESSAGING_SENDER_ID"': process.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+      '"VITE_FIREBASE_APP_ID"': process.env.VITE_FIREBASE_APP_ID,
+      '"VITE_FIREBASE_MEASUREMENT_ID"': process.env.VITE_FIREBASE_MEASUREMENT_ID,
     }
   },
   {
@@ -65,13 +102,14 @@ filesToProcess.forEach(({ file, replacements }) => {
     const regex = new RegExp(escapedKey, 'g');
     
     if (content.includes(key)) {
-      // Replace with actual value or keep fallback
+      // Replace with actual value
       if (value) {
         content = content.replace(regex, `"${value}"`);
         modified = true;
         console.log(`✅ Replaced ${key} in ${file}`);
       } else {
-        console.warn(`⚠️  ${key} not found in environment variables, keeping fallback`);
+        // This shouldn't happen for required vars (we check above), but handle gracefully
+        console.warn(`⚠️  ${key} not found in environment variables`);
       }
     }
   });
