@@ -4,6 +4,14 @@
 // Build script will replace this placeholder with actual value
 const GITHUB_TOKEN = 'VITE_GITHUB_TOKEN';
 
+// Debug: Log token status (only first 4 chars for security)
+if (typeof window !== 'undefined') {
+    const tokenStatus = GITHUB_TOKEN === 'VITE_GITHUB_TOKEN' 
+        ? 'NOT SET (placeholder)' 
+        : `SET (${GITHUB_TOKEN.substring(0, 4)}...)`;
+    console.log(`[GitHub API] Token status: ${tokenStatus}`);
+}
+
 // Cache for GitHub user data
 export let githubUserCache = {};
 
@@ -56,33 +64,56 @@ async function githubApiRequest(url, options = {}, maxRetries = 3) {
     };
     
     // Add token if available and not placeholder
-    if (GITHUB_TOKEN && GITHUB_TOKEN !== 'VITE_GITHUB_TOKEN' && GITHUB_TOKEN.trim() !== '') {
+    const hasToken = GITHUB_TOKEN && GITHUB_TOKEN !== 'VITE_GITHUB_TOKEN' && GITHUB_TOKEN.trim() !== '';
+    if (hasToken) {
         headers['Authorization'] = `token ${GITHUB_TOKEN}`;
+    } else {
+        // Log warning if token is missing (only once per session)
+        if (!window._githubTokenWarningShown) {
+            console.warn('GitHub token not found or invalid. Using unauthenticated requests (60 req/hour limit). Set VITE_GITHUB_TOKEN in Netlify environment variables.');
+            window._githubTokenWarningShown = true;
+        }
     }
     
     for (let attempt = 0; attempt < maxRetries; attempt++) {
         const response = await fetch(url, { ...options, headers });
         
         // Handle rate limiting
-        if (response.status === 429 || response.status === 403) {
+        if (response.status === 429) {
             await handleRateLimit(response);
-            
-            // If still rate limited after waiting, skip this request
-            if (response.status === 429 && attempt < maxRetries - 1) {
+            // Retry after waiting
+            if (attempt < maxRetries - 1) {
                 continue; // Retry after waiting
             }
-            
-            // If 403 and no token, skip silently (unauthenticated request)
-            if (response.status === 403 && (!GITHUB_TOKEN || GITHUB_TOKEN === 'VITE_GITHUB_TOKEN' || GITHUB_TOKEN.trim() === '')) {
-                console.warn(`GitHub API 403 Forbidden - token may be missing or invalid. Skipping request to ${url}`);
-                return response; // Return the response but don't throw
-            }
+            // If all retries exhausted, return the response
+            return response;
         }
         
+        // Handle 403 Forbidden
+        if (response.status === 403) {
+            // Check if it's a rate limit (GitHub sometimes returns 403 for rate limits)
+            const rateLimitRemaining = response.headers.get('X-RateLimit-Remaining');
+            if (rateLimitRemaining === '0') {
+                await handleRateLimit(response);
+                if (attempt < maxRetries - 1) {
+                    continue; // Retry after waiting
+                }
+            }
+            
+            // If 403 and no token, log and return
+            if (!hasToken) {
+                console.warn(`GitHub API 403 Forbidden - token may be missing or invalid. Skipping request to ${url}`);
+            } else {
+                console.warn(`GitHub API 403 Forbidden - token may be invalid or expired. Request: ${url}`);
+            }
+            return response; // Return the response but don't throw
+        }
+        
+        // Success or other status codes
         return response;
     }
     
-    // If all retries failed, return the last response
+    // Should never reach here, but just in case
     return fetch(url, { ...options, headers });
 }
 
@@ -367,18 +398,12 @@ export async function fetchUserPullRequests(githubUsername, state = 'all', limit
 export async function fetchRecentCommits(githubUsername, limit = 30) {
     try {
         // Return empty array if no token or token is placeholder
-        if (!GITHUB_TOKEN || GITHUB_TOKEN === 'VITE_GITHUB_TOKEN') {
+        if (!GITHUB_TOKEN || GITHUB_TOKEN === 'VITE_GITHUB_TOKEN' || GITHUB_TOKEN.trim() === '') {
             return [];
         }
         
-        const headers = {
-            'Accept': 'application/vnd.github.v3+json',
-            'Authorization': `token ${GITHUB_TOKEN}`
-        };
-        
-        const reposResponse = await fetch(
-            `https://api.github.com/users/${githubUsername}/repos?sort=updated&per_page=10`,
-            { headers }
+        const reposResponse = await githubApiRequest(
+            `https://api.github.com/users/${githubUsername}/repos?sort=updated&per_page=10`
         );
 
         if (!reposResponse.ok) {
@@ -392,9 +417,8 @@ export async function fetchRecentCommits(githubUsername, limit = 30) {
             if (allCommits.length >= limit) break;
             
             try {
-                const commitsResponse = await fetch(
-                    `https://api.github.com/repos/${repo.full_name}/commits?author=${githubUsername}&per_page=10&sort=author-date&order=desc`,
-                    { headers }
+                const commitsResponse = await githubApiRequest(
+                    `https://api.github.com/repos/${repo.full_name}/commits?author=${githubUsername}&per_page=10&sort=author-date&order=desc`
                 );
                 
                 if (commitsResponse.ok) {
@@ -412,9 +436,13 @@ export async function fetchRecentCommits(githubUsername, limit = 30) {
                             });
                         }
                     });
+                } else if (commitsResponse.status === 403 || commitsResponse.status === 429) {
+                    // Rate limited, stop fetching commits
+                    break;
                 }
                 
-                    await new Promise(r => setTimeout(r, 200));
+                // Delay between requests to avoid rate limits
+                await new Promise(r => setTimeout(r, 300));
             } catch (error) {
                 console.error(`Error fetching commits from ${repo.full_name}:`, error);
             }

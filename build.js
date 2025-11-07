@@ -107,7 +107,8 @@ filesToProcess.forEach(({ file, replacements }) => {
     if (content.includes(key)) {
       // Replace with actual value
       if (value) {
-        content = content.replace(regex, `"${value}"`);
+        // Value already has quotes from the replacement definition, use as-is
+        content = content.replace(regex, value);
         modified = true;
         console.log(`✅ Replaced ${key} in ${file}`);
       } else {
