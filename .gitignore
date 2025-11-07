@@ -5,8 +5,8 @@
 
 # Node modules (if you add any build tools)
 node_modules/
-package-lock.json
-yarn.lock
+# Note: package-lock.json and yarn.lock should be committed for production
+# to ensure consistent dependency versions across environments
 
 # IDE and editor files
 .vscode/

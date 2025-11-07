@@ -29,12 +29,6 @@ const filesToProcess = [
     replacements: {
       "'VITE_GITHUB_TOKEN'": process.env.VITE_GITHUB_TOKEN ? `'${process.env.VITE_GITHUB_TOKEN}'` : "''",
     }
-  },
-  {
-    file: 'app.js',
-    replacements: {
-      "'VITE_GITHUB_TOKEN'": process.env.VITE_GITHUB_TOKEN ? `'${process.env.VITE_GITHUB_TOKEN}'` : "''",
-    }
   }
 ];
 
