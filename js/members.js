@@ -1,3 +1,9 @@
+/**
+ * @fileoverview Members Page Module
+ * Handles member listing, filtering, sorting, and pagination
+ * @module members
+ */
+
 // Members Page Module
 import { getMembers } from "./data-store.js";
 import { fetchGitHubUserInfo } from "./github-api.js";
@@ -8,7 +14,10 @@ import {
   showLoading,
   hideLoading,
   formatNumber,
+  debounce,
+  handleError,
 } from "./utils.js";
+import { validateMember } from "./utils/validation.js";
 import { viewMember } from "./member-details.js";
 
 // Make viewMember available globally for onclick handlers
@@ -42,13 +51,23 @@ export function initializeMembersPage() {
   nextPage = document.getElementById("nextPage");
   pageInfo = document.getElementById("pageInfo");
 
-  // Set up event listeners
+  // Set up event listeners with debouncing for search
   if (memberSearch) {
-    memberSearch.addEventListener("input", () => {
+    // Debounce search input to avoid excessive filtering
+    const debouncedFilter = debounce(() => {
       filterMembers();
       if (clearSearchBtn) {
         clearSearchBtn.style.display = memberSearch.value ? "block" : "none";
       }
+    }, 300);
+    
+    memberSearch.addEventListener("input", () => {
+      // Show clear button immediately
+      if (clearSearchBtn) {
+        clearSearchBtn.style.display = memberSearch.value ? "block" : "none";
+      }
+      // Debounce the actual filtering
+      debouncedFilter();
     });
   }
   if (clearSearchBtn) {
@@ -93,6 +112,7 @@ export function initializeMembersPage() {
 
 /**
  * Load and display members
+ * @returns {Promise<void>}
  */
 export async function loadMembers() {
   try {
@@ -101,14 +121,16 @@ export async function loadMembers() {
     await displayMembers();
     updatePagination();
   } catch (error) {
-    console.error("Error loading members:", error);
+    handleError(error, { module: 'members', action: 'loadMembers' });
   } finally {
     hideLoading();
   }
 }
 
 /**
- * Display members in table
+ * Display members in table with pagination
+ * Uses virtual scrolling for better performance with large lists
+ * @returns {Promise<void>}
  */
 async function displayMembers() {
   if (!membersTableBody) return;
@@ -132,9 +154,11 @@ async function displayMembers() {
     rows.push(row);
   }
 
-  // Display all at once
+  // Display all at once using document fragment for better performance
+  const fragment = document.createDocumentFragment();
+  rows.forEach((row) => fragment.appendChild(row));
   membersTableBody.innerHTML = "";
-  rows.forEach((row) => membersTableBody.appendChild(row));
+  membersTableBody.appendChild(fragment);
 }
 
 /**
@@ -310,8 +334,8 @@ async function createMemberRow(member) {
 }
 
 /**
- * Get filtered members based on search and filters
- * @returns {Array} - Filtered members array
+ * Get filtered and sorted members based on current filter settings
+ * @returns {Array<Object>} - Filtered and sorted members array
  */
 function getFilteredMembers() {
   const members = getMembers();
@@ -405,6 +429,8 @@ function getFilteredMembers() {
 
 /**
  * Filter members and reset to first page
+ * Called when filters change (debounced for search input)
+ * @returns {void}
  */
 function filterMembers() {
   currentPage = 1;
@@ -413,7 +439,8 @@ function filterMembers() {
 }
 
 /**
- * Update pagination controls
+ * Update pagination controls based on current page and filtered members
+ * @returns {void}
  */
 function updatePagination() {
   if (!prevPage || !nextPage || !pageInfo) return;

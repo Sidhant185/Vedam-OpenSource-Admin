@@ -42,6 +42,16 @@ function initToastContainer() {
  * @param {number} duration - Duration in milliseconds (default: 4000)
  */
 export function showToast(message, type = 'info', duration = 4000) {
+    showToastNotification(message, type, duration);
+}
+
+/**
+ * Internal toast notification function
+ * @param {string} message - The message to display
+ * @param {string} type - Type of toast: 'success', 'error', 'warning', 'info'
+ * @param {number} duration - Duration in milliseconds (default: 4000)
+ */
+function showToastNotification(message, type = 'info', duration = 4000) {
     initToastContainer();
     
     const toast = document.createElement('div');
@@ -188,5 +198,240 @@ export function downloadCSV(content, filename) {
 export function formatNumber(num) {
     if (num === null || num === undefined || isNaN(num)) return '0';
     return num.toLocaleString();
+}
+
+/**
+ * Centralized Error Handler
+ * Provides consistent error handling across the application
+ */
+class ErrorHandler {
+    constructor() {
+        this.errorLog = [];
+        this.maxLogSize = 100; // Keep last 100 errors
+    }
+
+    /**
+     * Handle an error with context
+     * @param {Error|string} error - Error object or error message
+     * @param {Object} context - Additional context (user, action, etc.)
+     * @param {Object} options - Options for error handling
+     * @param {boolean} options.showToast - Show toast notification (default: true)
+     * @param {boolean} options.logToConsole - Log to console (default: true)
+     * @param {string} options.userMessage - Custom user-facing message
+     * @param {boolean} options.showRecovery - Show recovery suggestions (default: false)
+     */
+    handle(error, context = {}, options = {}) {
+        const {
+            showToast = true,
+            logToConsole = true,
+            userMessage = null,
+            showRecovery = false
+        } = options;
+
+        // Extract error information
+        const errorInfo = {
+            message: error instanceof Error ? error.message : String(error),
+            stack: error instanceof Error ? error.stack : null,
+            timestamp: new Date().toISOString(),
+            context: {
+                user: context.user || 'unknown',
+                action: context.action || 'unknown',
+                module: context.module || 'unknown',
+                ...context
+            }
+        };
+
+        // Add to error log
+        this.errorLog.push(errorInfo);
+        if (this.errorLog.length > this.maxLogSize) {
+            this.errorLog.shift(); // Remove oldest
+        }
+
+        // Log to console if enabled
+        if (logToConsole) {
+            console.error('Error:', errorInfo.message, {
+                context: errorInfo.context,
+                stack: errorInfo.stack
+            });
+        }
+
+        // Show user-friendly message
+        if (showToast) {
+            const message = userMessage || this.getUserFriendlyMessage(errorInfo.message, errorInfo.context);
+            // Call the showToast function defined in this module
+            showToastNotification(message, 'error', 6000);
+            
+            // Show recovery suggestions if enabled
+            if (showRecovery) {
+                const recovery = this.getRecoverySuggestion(errorInfo.message, errorInfo.context);
+                if (recovery) {
+                    setTimeout(() => {
+                        showToastNotification(recovery, 'info', 8000);
+                    }, 1000);
+                }
+            }
+        }
+
+        return errorInfo;
+    }
+
+    /**
+     * Get user-friendly error message
+     * @param {string} errorMessage - Original error message
+     * @param {Object} context - Error context
+     * @returns {string} - User-friendly message
+     */
+    getUserFriendlyMessage(errorMessage, context) {
+        // Network errors
+        if (errorMessage.includes('fetch') || errorMessage.includes('network') || errorMessage.includes('Failed to fetch')) {
+            return 'Network error. Please check your internet connection and try again.';
+        }
+
+        // Firebase errors
+        if (errorMessage.includes('Firebase') || errorMessage.includes('firebase')) {
+            if (errorMessage.includes('permission')) {
+                return 'Permission denied. You may not have access to perform this action.';
+            }
+            if (errorMessage.includes('not-found') || errorMessage.includes('404')) {
+                return 'The requested data was not found.';
+            }
+            return 'Database error. Please try again later.';
+        }
+
+        // GitHub API errors
+        if (errorMessage.includes('GitHub') || errorMessage.includes('github')) {
+            if (errorMessage.includes('rate limit') || errorMessage.includes('429')) {
+                return 'GitHub API rate limit reached. Please wait a few minutes and try again.';
+            }
+            if (errorMessage.includes('403') || errorMessage.includes('Forbidden')) {
+                return 'GitHub API access denied. Please check your token permissions.';
+            }
+            if (errorMessage.includes('409') || errorMessage.includes('Conflict')) {
+                return 'GitHub API conflict. The request could not be completed.';
+            }
+            return 'GitHub API error. Please try again later.';
+        }
+
+        // Authentication errors
+        if (errorMessage.includes('auth') || errorMessage.includes('login') || errorMessage.includes('password')) {
+            if (errorMessage.includes('user-not-found')) {
+                return 'User not found. Please check your email address.';
+            }
+            if (errorMessage.includes('wrong-password') || errorMessage.includes('invalid-credential')) {
+                return 'Incorrect email or password. Please try again.';
+            }
+            if (errorMessage.includes('too-many-requests')) {
+                return 'Too many login attempts. Please wait a few minutes before trying again.';
+            }
+            return 'Authentication error. Please check your credentials and try again.';
+        }
+
+        // Generic errors
+        return errorMessage || 'An unexpected error occurred. Please try again.';
+    }
+
+    /**
+     * Get recovery suggestion for error
+     * @param {string} errorMessage - Error message
+     * @param {Object} context - Error context
+     * @returns {string|null} - Recovery suggestion or null
+     */
+    getRecoverySuggestion(errorMessage, context) {
+        if (errorMessage.includes('network') || errorMessage.includes('fetch')) {
+            return '💡 Tip: Check your internet connection. If the problem persists, try refreshing the page.';
+        }
+        
+        if (errorMessage.includes('rate limit') || errorMessage.includes('429')) {
+            return '💡 Tip: GitHub API has rate limits. Wait 1 hour or add a GitHub token for higher limits.';
+        }
+
+        if (errorMessage.includes('permission') || errorMessage.includes('403')) {
+            return '💡 Tip: You may need admin privileges or valid API tokens to perform this action.';
+        }
+
+        return null;
+    }
+
+    /**
+     * Get error log
+     * @returns {Array} - Array of error information
+     */
+    getErrorLog() {
+        return [...this.errorLog];
+    }
+
+    /**
+     * Clear error log
+     */
+    clearErrorLog() {
+        this.errorLog = [];
+    }
+}
+
+// Create singleton instance
+const errorHandler = new ErrorHandler();
+
+/**
+ * Centralized error handling function
+ * @param {Error|string} error - Error object or error message
+ * @param {Object} context - Additional context
+ * @param {Object} options - Options for error handling
+ * @returns {Object} - Error information
+ */
+export function handleError(error, context = {}, options = {}) {
+    return errorHandler.handle(error, context, options);
+}
+
+/**
+ * Get error log for debugging
+ * @returns {Array} - Array of error information
+ */
+export function getErrorLog() {
+    return errorHandler.getErrorLog();
+}
+
+/**
+ * Clear error log
+ */
+export function clearErrorLog() {
+    errorHandler.clearErrorLog();
+}
+
+/**
+ * Debounce function - delays execution until after wait time has passed
+ * @param {Function} func - Function to debounce
+ * @param {number} wait - Wait time in milliseconds (default: 300)
+ * @param {boolean} immediate - If true, trigger on leading edge instead of trailing (default: false)
+ * @returns {Function} - Debounced function
+ */
+export function debounce(func, wait = 300, immediate = false) {
+    let timeout;
+    return function executedFunction(...args) {
+        const later = () => {
+            timeout = null;
+            if (!immediate) func(...args);
+        };
+        const callNow = immediate && !timeout;
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+        if (callNow) func(...args);
+    };
+}
+
+/**
+ * Throttle function - limits execution to at most once per wait time
+ * @param {Function} func - Function to throttle
+ * @param {number} limit - Time limit in milliseconds (default: 300)
+ * @returns {Function} - Throttled function
+ */
+export function throttle(func, limit = 300) {
+    let inThrottle;
+    return function executedFunction(...args) {
+        if (!inThrottle) {
+            func(...args);
+            inThrottle = true;
+            setTimeout(() => inThrottle = false, limit);
+        }
+    };
 }
 

@@ -1,0 +1,109 @@
+name: Accessibility Check
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  accessibility:
+    name: Accessibility Audit
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Install Playwright
+        run: npx playwright install --with-deps chromium || echo "Playwright not available, skipping browser tests"
+      
+      - name: Check ARIA labels
+        run: |
+          echo "🔍 Checking for ARIA labels..."
+          
+          # Check for buttons without aria-label
+          missing_aria=$(grep -r "<button" index.html forms.html 2>/dev/null | grep -v "aria-label" | grep -v "aria-hidden" | wc -l || echo "0")
+          
+          if [ "$missing_aria" -gt 0 ]; then
+            echo "⚠️  Found $missing_aria buttons without aria-label"
+            echo "Consider adding aria-label to improve accessibility"
+          else
+            echo "✅ All buttons have aria-label or aria-hidden"
+          fi
+          
+          # Check for form inputs without labels
+          missing_labels=$(grep -r "<input" index.html forms.html 2>/dev/null | grep -v "aria-label" | grep -v "id=" | wc -l || echo "0")
+          
+          if [ "$missing_labels" -gt 0 ]; then
+            echo "⚠️  Found $missing_labels inputs without labels"
+          else
+            echo "✅ All inputs have proper labels"
+          fi
+      
+      - name: Check semantic HTML
+        run: |
+          echo "🔍 Checking semantic HTML..."
+          
+          # Check for proper heading hierarchy
+          if grep -q "<h3>" index.html && ! grep -q "<h2>" index.html; then
+            echo "⚠️  WARNING: h3 found without h2 (heading hierarchy issue)"
+          fi
+          
+          # Check for navigation landmarks
+          if ! grep -q "role=\"navigation\"" index.html && ! grep -q "<nav" index.html; then
+            echo "⚠️  WARNING: Navigation landmark missing"
+          else
+            echo "✅ Navigation landmarks found"
+          fi
+          
+          # Check for main landmark
+          if ! grep -q "role=\"main\"" index.html && ! grep -q "<main" index.html; then
+            echo "⚠️  WARNING: Main landmark missing"
+          else
+            echo "✅ Main landmark found"
+          fi
+      
+      - name: Check keyboard navigation
+        run: |
+          echo "🔍 Checking keyboard navigation support..."
+          
+          # Check for tabindex
+          tabindex_count=$(grep -r "tabindex" index.html forms.html 2>/dev/null | wc -l || echo "0")
+          
+          if [ "$tabindex_count" -gt 0 ]; then
+            echo "✅ Found $tabindex_count elements with tabindex (keyboard navigation)"
+          else
+            echo "⚠️  Consider adding tabindex to interactive elements"
+          fi
+          
+          # Check for focusable elements
+          focusable=$(grep -r "button\|a\|input\|select\|textarea" index.html forms.html 2>/dev/null | wc -l || echo "0")
+          echo "✅ Found $focusable focusable elements"
+      
+      - name: Accessibility Summary
+        if: always()
+        run: |
+          echo "## Accessibility Audit Results"
+          echo ""
+          echo "✅ Accessibility checks completed"
+          echo ""
+          echo "**Checks Performed:**"
+          echo "- ARIA labels verification"
+          echo "- Semantic HTML structure"
+          echo "- Keyboard navigation support"
+          echo ""
+          echo "**Recommendations:**"
+          echo "- Ensure all interactive elements have ARIA labels"
+          echo "- Maintain proper heading hierarchy"
+          echo "- Test with screen readers"
+          echo "- Verify keyboard navigation works"
+

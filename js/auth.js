@@ -6,9 +6,9 @@ import {
     signOut 
 } from '../firebase-config.js';
 
-// Admin credentials
-const ADMIN_EMAIL = 'vstopensource@gmail.com';
-const ADMIN_PASSWORD = 'Sidhant908@';
+// Admin email from environment variable (injected at build time)
+// Password is handled by Firebase Auth - not stored in code
+const ADMIN_EMAIL = 'VITE_ADMIN_EMAIL'; // Placeholder - replaced at build time
 
 let currentUser = null;
 let authStateListeners = [];

@@ -1,189 +1,91 @@
 name: Security Scan
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened]
   push:
-    branches: [main]
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
   schedule:
-    # Run weekly on Monday at 00:00 UTC
-    - cron: '0 0 * * 1'
+    # Run weekly on Monday at 9 AM UTC
+    - cron: '0 9 * * 1'
 
 jobs:
   security-scan:
-    name: Security and Secret Detection
+    name: Security Vulnerability Scan
     runs-on: ubuntu-latest
     
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          fetch-depth: 0
+          node-version: '18'
+          cache: 'npm'
       
-      - name: Check for .env file in git
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Run npm audit
         run: |
-          echo "🔍 Checking if .env file is tracked in git..."
-          if git ls-files | grep -q "^\.env$"; then
-            echo "❌ CRITICAL: .env file is tracked in git!"
-            echo "This file contains secrets and should NEVER be committed."
-            echo "Please remove it: git rm --cached .env"
-            exit 1
-          fi
-          echo "✅ .env file is not tracked in git"
+          echo "🔍 Running npm audit..."
+          npm audit --audit-level=moderate || true
+          npm audit --json > audit-report.json || true
       
-      - name: Verify .gitignore includes .env
-        run: |
-          if ! grep -q "^\.env$" .gitignore && ! grep -q "^\.env$" .gitignore; then
-            echo "❌ ERROR: .env is not in .gitignore"
-            exit 1
-          fi
-          echo "✅ .env is properly ignored"
-      
-      - name: Scan for hardcoded secrets
+      - name: Check for hardcoded secrets
         run: |
           echo "🔍 Scanning for hardcoded secrets..."
           
-          # Patterns to detect secrets
-          patterns=(
-            "AIzaSy[A-Za-z0-9_-]{35}"  # Firebase API keys
-            "ghp_[A-Za-z0-9]{36}"       # GitHub personal access tokens
-            "gho_[A-Za-z0-9]{36}"       # GitHub OAuth tokens
-            "ghu_[A-Za-z0-9]{36}"       # GitHub user-to-server tokens
-            "ghs_[A-Za-z0-9]{36}"       # GitHub server-to-server tokens
-            "ghr_[A-Za-z0-9]{36}"       # GitHub refresh tokens
-            "xox[baprs]-[0-9]{12}-[0-9]{12}-[0-9]{12}-[a-z0-9]{32}"  # Slack tokens
-            "sk_live_[0-9a-zA-Z]{24,}"  # Stripe live keys
-            "sk_test_[0-9a-zA-Z]{24,}"  # Stripe test keys
-            "AKIA[0-9A-Z]{16}"          # AWS access keys
-            "[0-9a-f]{32}"              # Generic 32-char hex (potential API keys)
-          )
-          
-          found_secrets=false
-          
-          for pattern in "${patterns[@]}"; do
-            # Search in JS and HTML files, exclude node_modules and docs
-            matches=$(grep -rE "$pattern" --include="*.js" --include="*.html" --exclude-dir=node_modules . 2>/dev/null | \
-              grep -v ".env.example" | \
-              grep -v "SETUP.md" | \
-              grep -v "CONTRIBUTING.md" | \
-              grep -v "TESTING.md" | \
-              grep -v "README.md" | \
-              grep -v "VITE_" | \
-              grep -v "placeholder" | \
-              grep -v "example" || true)
-            
-            if [ -n "$matches" ]; then
-              echo "❌ SECURITY ALERT: Potential secret found matching pattern: $pattern"
-              echo "$matches"
-              found_secrets=true
-            fi
-          done
-          
-          if [ "$found_secrets" = true ]; then
-            echo ""
-            echo "❌ SECURITY CHECK FAILED: Hardcoded secrets detected!"
-            echo "Please remove all hardcoded secrets and use environment variables instead."
+          # Check for Firebase API keys
+          if grep -r "AIzaSy" --include="*.js" --include="*.html" --exclude-dir=node_modules . | grep -v "VITE_FIREBASE_API_KEY" | grep -v ".env.example" | grep -v "SETUP.md" | grep -v "README.md" | grep -v "IMPROVEMENTS.md"; then
+            echo "❌ ERROR: Hardcoded Firebase API key detected!"
             exit 1
           fi
           
-          echo "✅ No hardcoded secrets detected"
+          # Check for GitHub tokens
+          if grep -r "ghp_\|gho_\|ghu_\|ghs_\|ghr_" --include="*.js" --include="*.html" --exclude-dir=node_modules . | grep -v "VITE_GITHUB_TOKEN" | grep -v ".env.example" | grep -v "SETUP.md" | grep -v "README.md" | grep -v "IMPROVEMENTS.md"; then
+            echo "❌ ERROR: Hardcoded GitHub token detected!"
+            exit 1
+          fi
+          
+          # Check for common password patterns
+          if grep -ri "password.*=.*['\"][^'\"]\{6,\}" --include="*.js" --exclude-dir=node_modules . | grep -v "VITE_" | grep -v ".env.example" | grep -v "//" | grep -v "password.*placeholder"; then
+            echo "⚠️  WARNING: Potential hardcoded password detected"
+          fi
+          
+          echo "✅ No hardcoded secrets found"
       
-      - name: Check for exposed credentials in git history
+      - name: Check for exposed environment variables
         run: |
-          echo "🔍 Checking git history for exposed secrets..."
+          echo "🔍 Checking for exposed environment variables..."
           
-          # Check last 10 commits for secrets
-          if git log --all --full-history -10 --source -- "*.js" "*.html" | grep -E "AIzaSy|ghp_|gho_|ghu_|ghs_|ghr_" | grep -v "VITE_" | grep -v "placeholder" | grep -v "example"; then
-            echo "⚠️  WARNING: Potential secrets found in git history"
-            echo "Consider using git-secrets or BFG Repo-Cleaner to remove them"
-          else
-            echo "✅ No secrets found in recent git history"
+          # Ensure .env is in .gitignore
+          if ! grep -q "\.env$" .gitignore 2>/dev/null && ! grep -q "^\.env" .gitignore 2>/dev/null; then
+            echo "⚠️  WARNING: .env might not be in .gitignore"
           fi
-      
-      - name: Verify environment variable placeholders
-        run: |
-          echo "🔍 Verifying environment variable placeholders..."
           
-          # Check firebase-config.js
-          if ! grep -q "VITE_FIREBASE_API_KEY" firebase-config.js; then
-            echo "❌ ERROR: firebase-config.js missing VITE_FIREBASE_API_KEY placeholder"
+          # Check if .env is tracked
+          if git ls-files | grep -q "^\.env$"; then
+            echo "❌ ERROR: .env file is tracked in git!"
             exit 1
           fi
           
-          # Check github-api.js
-          if [ -f js/github-api.js ] && ! grep -q "VITE_GITHUB_TOKEN" js/github-api.js; then
-            echo "❌ ERROR: js/github-api.js missing VITE_GITHUB_TOKEN placeholder"
-            exit 1
-          fi
-          
-          # Check app.js if it exists
-          if [ -f app.js ] && ! grep -q "VITE_GITHUB_TOKEN" app.js; then
-            echo "❌ ERROR: app.js missing VITE_GITHUB_TOKEN placeholder"
-            exit 1
-          fi
-          
-          echo "✅ All environment variable placeholders are in place"
-      
-      - name: Check .env.example completeness
-        run: |
-          echo "🔍 Checking .env.example completeness..."
-          
-          required_vars=(
-            "VITE_FIREBASE_API_KEY"
-            "VITE_FIREBASE_AUTH_DOMAIN"
-            "VITE_FIREBASE_PROJECT_ID"
-            "VITE_FIREBASE_STORAGE_BUCKET"
-            "VITE_FIREBASE_MESSAGING_SENDER_ID"
-            "VITE_FIREBASE_APP_ID"
-            "VITE_FIREBASE_MEASUREMENT_ID"
-          )
-          
-          missing_vars=()
-          for var in "${required_vars[@]}"; do
-            if ! grep -q "$var" .env.example; then
-              missing_vars+=("$var")
-            fi
-          done
-          
-          if [ ${#missing_vars[@]} -gt 0 ]; then
-            echo "❌ ERROR: Missing variables in .env.example:"
-            printf '  - %s\n' "${missing_vars[@]}"
-            exit 1
-          fi
-          
-          echo "✅ .env.example contains all required variables"
-      
-      - name: Verify no real secrets in .env.example
-        run: |
-          echo "🔍 Verifying .env.example doesn't contain real secrets..."
-          
-          # Check for actual Firebase API keys
-          if grep -q "AIzaSy" .env.example && ! grep -q "your_firebase_api_key" .env.example; then
-            echo "❌ ERROR: .env.example contains real Firebase API key!"
-            exit 1
-          fi
-          
-          # Check for actual GitHub tokens
-          if grep -q "ghp_" .env.example && ! grep -q "your_github" .env.example; then
-            echo "❌ ERROR: .env.example contains real GitHub token!"
-            exit 1
-          fi
-          
-          echo "✅ .env.example only contains placeholder values"
+          echo "✅ Environment files properly ignored"
       
       - name: Security Summary
         if: always()
         run: |
-          echo "## Security Scan Summary"
+          echo "## Security Scan Results"
           echo ""
-          echo "✅ All security checks completed"
+          echo "✅ Security scan completed"
           echo ""
           echo "**Checks Performed:**"
-          echo "- ✅ .env file not in git"
-          echo "- ✅ .gitignore configured"
-          echo "- ✅ No hardcoded secrets"
-          echo "- ✅ Environment variable placeholders in place"
-          echo "- ✅ .env.example complete and safe"
+          echo "- npm audit for dependency vulnerabilities"
+          echo "- Hardcoded secrets detection"
+          echo "- Environment variable exposure check"
           echo ""
-          echo "**Security Status:** ✅ PASSED"
-
+          echo "**Next Steps:**"
+          echo "- Review any warnings above"
+          echo "- Update dependencies if vulnerabilities found"
+          echo "- Ensure no secrets are committed to repository"

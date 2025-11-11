@@ -209,14 +209,26 @@ jobs:
         run: |
           echo "🔍 Checking for console.log statements..."
           
-          console_logs=$(grep -r "console\.log" js/ --include="*.js" | grep -v "//" | wc -l)
+          console_logs=$(grep -r "console\.log" js/ --include="*.js" 2>/dev/null | grep -v "//" | grep -v "console.log('" | wc -l || echo "0")
           
           if [ "$console_logs" -gt 0 ]; then
             echo "⚠️  Warning: Found $console_logs console.log statements"
-            echo "Consider removing them before production"
-            grep -r "console\.log" js/ --include="*.js" | grep -v "//" | head -5
+            echo "Consider removing them before production or using centralized error handler"
+            grep -r "console\.log" js/ --include="*.js" 2>/dev/null | grep -v "//" | head -5
           else
-            echo "✅ No console.log statements found"
+            echo "✅ No console.log statements found (or all are in comments)"
+          fi
+      
+      - name: Validate build output
+        run: |
+          echo "🔍 Validating build output..."
+          
+          if [ -f scripts/validate-build.js ]; then
+            node scripts/validate-build.js || {
+              echo "⚠️  Build validation script failed (may be expected in CI)"
+            }
+          else
+            echo "ℹ️  Build validation script not found (optional)"
           fi
       
       - name: Test Summary

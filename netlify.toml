@@ -1,5 +1,5 @@
 [build]
-  # Build command to inject environment variables
+  # Build command to inject environment variables into source files
   command = "npm install && npm run build"
   publish = "."
 

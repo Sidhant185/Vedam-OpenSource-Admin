@@ -1,3 +1,9 @@
+/**
+ * @fileoverview Main Application Entry Point
+ * Initializes authentication, navigation, and handles application-level events
+ * @module app
+ */
+
 // Main Application Entry Point
 import { initializeAuth, adminLogin, adminLogout, getCurrentUser } from './auth.js';
 import { loadMembersData, getMembers, clearMembersCache } from './data-store.js';
@@ -5,26 +11,30 @@ import { loadDashboard } from './dashboard.js';
 import { initializeMembersPage, loadMembers } from './members.js';
 import { loadAnalytics } from './analytics.js';
 import { loadSettings } from './settings.js';
-import { clearGitHubCache, fetchGitHubUserInfo, getUserActivitySnapshot, fetchUserLanguages, fetchUserRepositories, fetchContributionCalendar } from './github-api.js';
-import { showLoading, hideLoading, downloadCSV } from './utils.js';
+import { clearGitHubCache, fetchGitHubUserInfo } from './github-api.js';
+import { startBackgroundGitHubRefresh } from './github-refresh.js';
+import { showLoading, hideLoading, downloadCSV, handleError } from './utils.js';
+import { 
+    initializeNavigation, 
+    showLoginScreen, 
+    showDashboard, 
+    showPage,
+    showLoginError,
+    clearLoginForm,
+    toggleSidebar
+} from './navigation.js';
 import { doc, getDoc, setDoc, updateDoc, db } from '../firebase-config.js';
 
 // DOM elements
-const loginScreen = document.getElementById('loginScreen');
-const dashboard = document.getElementById('dashboard');
-const loginForm = document.getElementById('loginForm');
-const loginError = document.getElementById('loginError');
 const logoutBtn = document.getElementById('logoutBtn');
 const adminEmail = document.getElementById('adminEmail');
 const sidebarToggle = document.getElementById('sidebarToggle');
-const sidebar = document.getElementById('sidebar');
-
-// Navigation elements
-const navItems = document.querySelectorAll('.nav-item');
-const pages = document.querySelectorAll('.page');
 
 // Initialize app
 document.addEventListener('DOMContentLoaded', () => {
+    // Initialize navigation first
+    initializeNavigation();
+    
     setupEventListeners();
     
     // Initialize auth
@@ -42,10 +52,13 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 /**
- * Setup all event listeners
+ * Setup all event listeners for the application
+ * Handles login form, logout, sidebar toggle, and action buttons
+ * @returns {void}
  */
 function setupEventListeners() {
     // Login form
+    const loginForm = document.getElementById('loginForm');
     if (loginForm) {
         loginForm.addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -56,7 +69,8 @@ function setupEventListeners() {
                 showLoading();
                 await adminLogin(email, password);
             } catch (error) {
-                showError(error.message || 'Login failed. Please check your credentials.');
+                showLoginError(error.message || 'Login failed. Please check your credentials.');
+                handleError(error, { module: 'app', action: 'login' });
             } finally {
                 hideLoading();
             }
@@ -70,95 +84,15 @@ function setupEventListeners() {
                 await adminLogout();
                 showLoginScreen();
             } catch (error) {
-                console.error('Logout error:', error);
+                handleError(error, { module: 'app', action: 'logout' });
             }
         });
     }
 
     // Sidebar toggle
     if (sidebarToggle) {
-        sidebarToggle.addEventListener('click', () => {
-            if (sidebar && dashboard) {
-                sidebar.classList.toggle('open');
-                // Add/remove class to dashboard for easier CSS targeting
-                if (sidebar.classList.contains('open')) {
-                    dashboard.classList.add('sidebar-open');
-                } else {
-                    dashboard.classList.remove('sidebar-open');
-                }
-            }
-        });
+        sidebarToggle.addEventListener('click', toggleSidebar);
     }
-
-    // Navigation
-    navItems.forEach(item => {
-        item.addEventListener('click', () => {
-            const page = item.dataset.page;
-            if (page) {
-                showPage(page);
-                
-                // Update active nav item
-                navItems.forEach(nav => nav.classList.remove('active'));
-                item.classList.add('active');
-            }
-        });
-    });
-
-    // Dropdown navigation items
-    const dropdownItems = document.querySelectorAll('.nav-dropdown-item');
-    dropdownItems.forEach(item => {
-        item.addEventListener('click', (e) => {
-            e.stopPropagation();
-            e.preventDefault();
-            const page = item.dataset.page;
-            if (page === 'forms') {
-                // Navigate to forms.html page
-                window.location.href = 'forms.html';
-                return;
-            } else if (page) {
-                // For other pages in index.html
-                // Close dropdown first
-                const dropdown = item.closest('.nav-item-dropdown');
-                if (dropdown) {
-                    dropdown.classList.remove('open');
-                    const menu = dropdown.querySelector('.nav-dropdown-menu');
-                    const arrow = dropdown.querySelector('.nav-dropdown-arrow');
-                    if (menu) {
-                        menu.classList.remove('show');
-                    }
-                    if (arrow) {
-                        arrow.style.transform = 'rotate(0deg)';
-                    }
-                }
-                
-                showPage(page);
-                
-                // Update active nav item
-                navItems.forEach(nav => nav.classList.remove('active'));
-                dropdownItems.forEach(dropItem => dropItem.classList.remove('active'));
-                item.classList.add('active');
-                
-                // Mark parent dropdown as active
-                if (dropdown) {
-                    dropdown.classList.add('active');
-                }
-            }
-        });
-    });
-
-    // Dropdown toggle - only toggle, don't navigate
-    const dropdownHeaders = document.querySelectorAll('.nav-item-header');
-    dropdownHeaders.forEach(header => {
-        header.addEventListener('click', (e) => {
-            e.stopPropagation();
-            e.preventDefault();
-            const dropdown = header.closest('.nav-item-dropdown');
-            if (dropdown) {
-                // Simply toggle the open class - CSS will handle all visibility
-                dropdown.classList.toggle('open');
-            }
-        });
-    });
 
     // Export and refresh buttons
     const exportMembers = document.getElementById('exportMembers');
@@ -189,93 +123,18 @@ async function loadInitialData() {
         // Load dashboard by default
         loadDashboard();
     } catch (error) {
-        console.error('Error loading initial data:', error);
+        handleError(error, { module: 'app', action: 'loadInitialData' });
     } finally {
         hideLoading();
     }
 }
 
-/**
- * Show login screen
- */
-function showLoginScreen() {
-    if (loginScreen) loginScreen.style.display = 'flex';
-    if (dashboard) dashboard.style.display = 'none';
-    clearLoginForm();
-}
+// Navigation functions are now imported from './navigation.js'
 
 /**
- * Show dashboard
- */
-function showDashboard() {
-    if (loginScreen) loginScreen.style.display = 'none';
-    if (dashboard) dashboard.style.display = 'flex';
-}
-
-/**
- * Show error message
- */
-function showError(message) {
-    if (loginError) {
-        loginError.textContent = message;
-        loginError.style.display = 'block';
-        setTimeout(() => {
-            loginError.style.display = 'none';
-        }, 5000);
-    }
-}
-
-/**
- * Clear login form
- */
-function clearLoginForm() {
-    if (loginForm) loginForm.reset();
-    if (loginError) loginError.style.display = 'none';
-}
-
-/**
- * Navigate to specific page
- * @param {string} pageId - Page ID to show
- */
-function showPage(pageId) {
-    // Hide all pages
-    pages.forEach(page => {
-        page.classList.remove('active');
-    });
-    
-    const targetPage = document.getElementById(pageId + 'Page');
-    if (targetPage) {
-        targetPage.classList.add('active');
-        
-        // Load page-specific data
-        switch (pageId) {
-            case 'dashboard':
-                loadDashboard();
-                break;
-            case 'members':
-                // Initialize members page if not already done
-                if (window.membersPageInitialized !== true) {
-                    initializeMembersPage();
-                    window.membersPageInitialized = true;
-                }
-                loadMembers();
-                break;
-            case 'analytics':
-                loadAnalytics();
-                break;
-            case 'settings':
-                loadSettings();
-                break;
-            case 'forms':
-                // Navigate to forms.html
-                window.location.href = 'forms.html';
-                break;
-        }
-    }
-}
-
-/**
- * Refresh all GitHub data
+ * Refresh all GitHub data for all members
+ * This is a lightweight refresh that only updates profile info, not full activity
+ * @returns {Promise<void>}
  */
 async function refreshAllGitHubData() {
     if (!confirm('This will refresh GitHub data for all members. This may take a while. Continue?')) {
@@ -321,7 +180,11 @@ async function refreshAllGitHubData() {
                     
                     await new Promise(r => setTimeout(r, 1000));
                 } catch (error) {
-                    console.error(`Error updating GitHub data for ${member.githubUsername}:`, error);
+                    handleError(error, { 
+                        module: 'app', 
+                        action: 'refreshAllGitHubData',
+                        username: member.githubUsername 
+                    }, { showToast: false });
                     errorCount++;
                 }
             }
@@ -348,258 +211,12 @@ async function refreshAllGitHubData() {
     }
 }
 
-/**
- * Background GraphQL-based refresh with batching and progress UI
- */
-async function startBackgroundGitHubRefresh({ days = 365 } = {}) {
-    const progressBar = document.getElementById('refreshProgressBar');
-    const progressText = document.getElementById('refreshProgressText');
-    const progressWrap = document.getElementById('refreshProgressWrap');
-    const members = getMembers().filter(m => m.githubConnected && m.githubUsername);
-    if (!members.length) return;
-
-    // Lifetime contributions mode: don't build fixed window; we'll still fetch recent PRs internally
-
-    let completed = 0;
-    let errorCount = 0;
-    // Reduced batch size and increased delay to avoid GitHub API rate limits
-    // Without token: 60 requests/hour, with token: 5000 requests/hour
-    const batchSize = 2; // Process 2 members at a time
-    const delayBetween = 2000; // 2 second delay between batches
-
-    if (progressWrap) progressWrap.style.display = 'block';
-    const updateUI = () => {
-        const pct = Math.round((completed / members.length) * 100);
-        if (progressBar) progressBar.style.width = pct + '%';
-        if (progressText) progressText.textContent = `Refreshing ${completed}/${members.length}`;
-    };
-    updateUI();
-
-    for (let i = 0; i < members.length; i += batchSize) {
-        const batch = members.slice(i, i + batchSize);
-        const batchNumber = Math.floor(i / batchSize) + 1;
-        console.log(`Processing batch ${batchNumber} (members ${i} to ${i + batchSize - 1})`);
-        
-        // Process each member with timeout protection
-        await Promise.all(batch.map(async (member) => {
-            const timeoutPromise = new Promise((_, reject) => {
-                setTimeout(() => reject(new Error(`Timeout: ${member.githubUsername} took too long`)), 60000); // 60 second timeout
-            });
-            
-            const processPromise = (async () => {
-                try {
-                    console.log(`Starting fetch for ${member.githubUsername}...`);
-                    
-                    // Fetch user info first (lightweight)
-                    const snap = await getUserActivitySnapshot(member.githubUsername, { lifetime: true, prsFirst: 50 }).catch((err) => {
-                        console.error(`Error in getUserActivitySnapshot for ${member.githubUsername}:`, err);
-                        return {
-                            publicRepos: 0,
-                            followers: 0,
-                            following: 0,
-                            contributions: 0,
-                            commits: 0,
-                            pullRequests: 0,
-                            mergedPRs: 0,
-                            openPRs: 0,
-                            closedPRs: 0,
-                            issues: 0,
-                            recentPRs: [],
-                            totalStars: 0,
-                            totalForks: 0
-                        };
-                    });
-                    
-                    // Small delay before next API call
-                    await new Promise(r => setTimeout(r, 200));
-                    
-                    // Fetch repos (moderate API usage)
-                    const repos = await fetchUserRepositories(member.githubUsername, 100).catch((err) => {
-                        console.warn(`Error fetching repos for ${member.githubUsername}:`, err);
-                        return [];
-                    });
-                    
-                    // Small delay before next API call
-                    await new Promise(r => setTimeout(r, 200));
-                    
-                    // Skip language fetching if no token (requires many API calls)
-                    // Only fetch languages if we have a valid token
-                    let languages = {};
-                    try {
-                        languages = await fetchUserLanguages(member.githubUsername, 100);
-                    } catch (err) {
-                        console.warn(`Error fetching languages for ${member.githubUsername}:`, err);
-                    }
-                    
-                    // Calendar is not implemented, always null
-                    const calendar = null;
-                    
-                    console.log(`Completed API calls for ${member.githubUsername}`);
-                    
-                    // Validate that we got contributions and commits
-                    if (snap.contributions === undefined || snap.commits === undefined) {
-                        console.warn(`Missing contributions/commits for ${member.githubUsername}:`, {
-                            contributions: snap.contributions,
-                            commits: snap.commits
-                        });
-                    }
-                    
-                    // Calculate totalStars and totalForks from repositories
-                    const totalStars = repos.reduce((sum, repo) => sum + (repo.stars || 0), 0);
-                    const totalForks = repos.reduce((sum, repo) => sum + (repo.forks || 0), 0);
-                    const privateRepos = repos.filter(repo => repo.is_private).length;
-                    
-                    // Ensure contributions and commits are valid numbers
-                    const contributions = Number.isFinite(snap.contributions) && snap.contributions >= 0 
-                        ? snap.contributions 
-                        : (member.githubActivity?.contributions || 0);
-                    const commits = Number.isFinite(snap.commits) && snap.commits >= 0 
-                        ? snap.commits 
-                        : (member.githubActivity?.commits || 0);
-                    
-                    console.log(`Updating Firebase for ${member.githubUsername}...`);
-                    const memberRef = doc(db, 'Members', member.id);
-                    await updateDoc(memberRef, {
-                        githubActivity: {
-                            ...(member.githubActivity || {}),
-                            publicRepos: snap.publicRepos !== undefined ? snap.publicRepos : (member.githubActivity?.publicRepos || 0),
-                            privateRepos: privateRepos,
-                            followers: snap.followers !== undefined ? snap.followers : (member.githubActivity?.followers || 0),
-                            following: snap.following !== undefined ? snap.following : (member.githubActivity?.following || 0),
-                            contributions: contributions,
-                            commits: commits,
-                            pullRequests: snap.pullRequests !== undefined ? snap.pullRequests : (member.githubActivity?.pullRequests || 0),
-                            mergedPRs: snap.mergedPRs !== undefined ? snap.mergedPRs : (member.githubActivity?.mergedPRs || 0),
-                            openPRs: snap.openPRs !== undefined ? snap.openPRs : (member.githubActivity?.openPRs || 0),
-                            closedPRs: snap.closedPRs !== undefined ? snap.closedPRs : (member.githubActivity?.closedPRs || 0),
-                            issues: snap.issues !== undefined ? snap.issues : (member.githubActivity?.issues || 0),
-                            recentPRs: snap.recentPRs || (member.githubActivity?.recentPRs || []),
-                            totalStars: totalStars,
-                            totalForks: totalForks,
-                            languages: languages, // Store language breakdown
-                            contributionCalendar: calendar, // Store calendar data for heatmap
-                            lastUpdated: new Date().toISOString()
-                        },
-                        lastUpdated: new Date().toISOString()
-                    });
-                    
-                    console.log(`Updated ${member.githubUsername}: ${contributions} contributions, ${commits} commits`);
-                } catch (e) {
-                    console.error(`Error updating GitHub data for ${member.githubUsername}:`, e);
-                    console.error(`Stack trace:`, e.stack);
-                    errorCount++;
-                    throw e; // Re-throw to be caught by Promise.race
-                } finally {
-                    completed++;
-                    updateUI();
-                    // Notify listeners to update UI rows
-                    window.dispatchEvent(new CustomEvent('memberUpdated'));
-                }
-            })();
-            
-            // Race between processing and timeout
-            try {
-                await Promise.race([processPromise, timeoutPromise]);
-            } catch (timeoutError) {
-                console.error(`Timeout or error for ${member.githubUsername}:`, timeoutError);
-                completed++;
-                updateUI();
-                errorCount++;
-            }
-        }));
-        
-        console.log(`Batch ${batchNumber} completed. Waiting ${delayBetween}ms before next batch...`);
-        await new Promise(r => setTimeout(r, delayBetween));
-    }
-
-    // Force refresh from Firebase after manual refresh
-    await loadMembersData(true);
-    
-    // Update ClubStats after refresh
-    await updateClubStats();
-    
-    if (progressWrap) progressWrap.style.display = 'none';
-    alert(`GitHub refresh complete. Updated: ${members.length - errorCount}, Errors: ${errorCount}`);
-    // Refresh dashboard analytics after completion
-    loadDashboard();
-}
+// GitHub refresh and club stats are now in separate modules
+// startBackgroundGitHubRefresh is imported from './github-refresh.js'
 
 /**
- * Calculate and update ClubStats in Firebase
- * This aggregates stats from all members
- */
-async function updateClubStats() {
-    try {
-        const members = getMembers();
-        const now = new Date().toISOString();
-        
-        // Calculate aggregated stats
-        let totalMembers = members.length;
-        let membersWithGitHub = 0;
-        let totalProjects = 0; // Total repos (public + private)
-        let totalStars = 0;
-        let totalCommits = 0; // Total contributions
-        let totalForks = 0;
-        let totalPullRequests = 0;
-        
-        members.forEach(member => {
-            if (member.githubConnected) {
-                membersWithGitHub++;
-                
-                if (member.githubActivity) {
-                    // Count total repos (public + private)
-                    const publicRepos = member.githubActivity.publicRepos || 0;
-                    const privateRepos = member.githubActivity.privateRepos || 0;
-                    totalProjects += publicRepos + privateRepos;
-                    
-                    // Sum other stats
-                    totalStars += member.githubActivity.totalStars || 0;
-                    totalCommits += member.githubActivity.commits || 0; // Use commits, not contributions
-                    totalForks += member.githubActivity.totalForks || 0;
-                    totalPullRequests += member.githubActivity.pullRequests || 0;
-                }
-            }
-        });
-        
-        // Get existing ClubStats to preserve 'events' if it exists
-        const statsRef = doc(db, 'ClubStats', 'main');
-        let existingEvents = 10; // Default value
-        
-        try {
-            const statsSnap = await getDoc(statsRef);
-            if (statsSnap.exists()) {
-                existingEvents = statsSnap.data().events || 10;
-            }
-        } catch (e) {
-            console.warn('Could not fetch existing ClubStats, using default events value');
-        }
-        
-        // Prepare stats object matching the format
-        const clubStats = {
-            calculatedAt: now,
-            events: existingEvents, // Preserve existing events value
-            lastUpdated: now,
-            members: totalMembers,
-            membersWithGitHub: membersWithGitHub,
-            projects: totalProjects,
-            stars: totalStars,
-            totalCommits: totalCommits,
-            totalForks: totalForks,
-            totalPullRequests: totalPullRequests
-        };
-        
-        // Update ClubStats document (create if doesn't exist, update if exists)
-        await setDoc(statsRef, clubStats, { merge: true });
-        
-        console.log('ClubStats updated successfully:', clubStats);
-    } catch (error) {
-        console.error('Error updating ClubStats:', error);
-        // Don't throw - allow refresh to complete even if stats update fails
-    }
-}
-
-/**
- * Show export options modal
+ * Show export options modal for member data
+ * @returns {void}
  */
 function showExportOptions() {
     const exportModal = document.createElement('div');
@@ -645,7 +262,9 @@ function showExportOptions() {
 }
 
 /**
- * Export members data
+ * Export members data in specified format
+ * @param {string} format - Export format: 'csv' or 'pdf' (default: 'csv')
+ * @returns {Promise<void>}
  */
 async function exportMembersData(format = 'csv') {
     try {
@@ -659,15 +278,17 @@ async function exportMembersData(format = 'csv') {
             await generatePDF(members);
         }
     } catch (error) {
-        console.error('Export error:', error);
-        alert('Error exporting data. Please try again.');
+        handleError(error, { module: 'app', action: 'exportMembersData', format });
+        showToast('Error exporting data. Please try again.', 'error');
     } finally {
         hideLoading();
     }
 }
 
 /**
- * Convert members to CSV
+ * Convert members array to CSV format
+ * @param {Array<Object>} members - Array of member objects
+ * @returns {Promise<string>} - CSV content as string
  */
 async function convertToCSV(members) {
     const { getMemberDisplayName, getMemberEmail, getMemberPhone, formatDate } = await import('./utils.js');
@@ -676,7 +297,7 @@ async function convertToCSV(members) {
         'Name', 'Email', 'Phone Number', 'WhatsApp Number',
         'GitHub Username', 'GitHub Profile URL', 'GitHub Connected',
         'Public Repos', 'Followers', 'Following',
-        'Total Stars', 'Total Contributions', 'Joined Date', 'Last Updated'
+        'Total Stars', 'Total Commits', 'Joined Date', 'Last Updated'
     ];
     
     const rows = await Promise.all(members.map(async (member) => {
@@ -693,7 +314,7 @@ async function convertToCSV(members) {
         let followers = 'N/A';
         let following = 'N/A';
         let totalStars = 'N/A';
-        let totalContributions = 'N/A';
+        let totalCommits = 'N/A';
         
         if (member.githubConnected && member.githubUsername) {
             const githubInfo = await fetchGitHubUserInfo(member.githubUsername);
@@ -709,14 +330,14 @@ async function convertToCSV(members) {
         
         if (member.githubActivity) {
             totalStars = member.githubActivity.totalStars || 'N/A';
-            totalContributions = member.githubActivity.contributions || 'N/A';
+            totalCommits = member.githubActivity?.commits !== undefined ? member.githubActivity.commits : 'N/A';
         }
         
         return [
             name, email, phoneNumber, whatsappNumber,
             githubUsername, githubProfileUrl, member.githubConnected ? 'Yes' : 'No',
             publicRepos, followers, following,
-            totalStars, totalContributions, joinedDate, lastUpdated
+            totalStars, totalCommits, joinedDate, lastUpdated
         ];
     }));
     
@@ -724,7 +345,10 @@ async function convertToCSV(members) {
 }
 
 /**
- * Generate PDF
+ * Generate PDF report for members
+ * Opens a new window with formatted table and triggers print dialog
+ * @param {Array<Object>} members - Array of member objects
+ * @returns {Promise<void>}
  */
 async function generatePDF(members) {
     const { getMemberDisplayName, getMemberEmail, getMemberPhone, formatDate } = await import('./utils.js');
@@ -768,12 +392,17 @@ async function generatePDF(members) {
     printWindow.document.close();
 }
 
+/**
+ * Generate HTML table for members data
+ * @param {Array<Object>} members - Array of member objects
+ * @returns {Promise<string>} - HTML table string
+ */
 async function generateMembersTableHTML(members) {
     const { getMemberDisplayName, getMemberEmail, getMemberPhone, formatDate } = await import('./utils.js');
     
     const headers = [
         'Name', 'Email', 'Phone', 'GitHub Username', 'GitHub Profile',
-        'Connected', 'Public Repos', 'Followers', 'Stars', 'Contributions', 'Joined'
+        'Connected', 'Public Repos', 'Followers', 'Stars', 'Commits', 'Joined'
     ];
     
     const rows = await Promise.all(members.map(async (member) => {
@@ -787,7 +416,7 @@ async function generateMembersTableHTML(members) {
         let publicRepos = 'N/A';
         let followers = 'N/A';
         let totalStars = 'N/A';
-        let totalContributions = 'N/A';
+        let totalCommits = 'N/A';
         
         if (member.githubConnected && member.githubUsername) {
             const githubInfo = await fetchGitHubUserInfo(member.githubUsername);
@@ -802,13 +431,13 @@ async function generateMembersTableHTML(members) {
         
         if (member.githubActivity) {
             totalStars = member.githubActivity.totalStars || 'N/A';
-            totalContributions = member.githubActivity.contributions || 'N/A';
+            totalCommits = member.githubActivity?.commits !== undefined ? member.githubActivity.commits : 'N/A';
         }
         
         return [
             name, email, phone, githubUsername, githubProfileUrl,
             member.githubConnected ? 'Yes' : 'No',
-            publicRepos, followers, totalStars, totalContributions, joinedDate
+            publicRepos, followers, totalStars, totalCommits, joinedDate
         ];
     }));
     

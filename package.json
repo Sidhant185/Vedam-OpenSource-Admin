@@ -5,8 +5,11 @@
   "main": "index.html",
   "scripts": {
     "build": "node build.js",
-    "dev": "http-server -p 8000 -c-1",
-    "start": "npm run dev"
+    "build:validate": "node scripts/validate-build.js",
+    "dev": "node scripts/dev-server.js",
+    "start": "npm run dev",
+    "lint": "echo 'Linting not configured yet'",
+    "test": "echo 'Tests not configured yet'"
   },
   "keywords": [
     "admin",

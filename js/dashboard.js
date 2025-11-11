@@ -1,3 +1,9 @@
+/**
+ * @fileoverview Dashboard Page Module
+ * Handles dashboard display, statistics, and charts
+ * @module dashboard
+ */
+
 // Dashboard Page Module
 import { getMembers } from "./data-store.js";
 import {
@@ -5,13 +11,17 @@ import {
   formatNumber,
   showLoading,
   hideLoading,
+  handleError,
 } from "./utils.js";
+import { calculateDashboardStats, getTopCommitters } from "./services/stats-service.js";
 
 
 const dashboardDateRange = 30; // Fixed to 30 days
 
 /**
  * Load dashboard data and render charts
+ * Fetches members data and displays statistics and visualizations
+ * @returns {Promise<void>}
  */
 export async function loadDashboard() {
   try {
@@ -22,7 +32,7 @@ export async function loadDashboard() {
     loadDashboardCharts(members);
     loadTopCommitters(members);
   } catch (error) {
-    console.error("Error loading dashboard:", error);
+    handleError(error, { module: 'dashboard', action: 'loadDashboard' });
   } finally {
     hideLoading();
   }
@@ -30,55 +40,42 @@ export async function loadDashboard() {
 
 /**
  * Update dashboard statistics
+ * Uses centralized stats service for consistent calculations
  * @param {Array} members - Array of member objects
  */
 function updateDashboardStats(members) {
-  const total = members.length;
+  try {
+    // Use centralized stats calculation
+    const stats = calculateDashboardStats(members);
 
-  // Calculate GitHub activity stats
-  let totalRepos = 0;
-  let totalStars = 0;
-  let totalPRs = 0;
-  let totalCommits = 0;
+    // Update stat elements
+    const totalMembersEl = document.getElementById("totalMembers");
+    const dashboardTotalReposEl = document.getElementById("dashboardTotalRepos");
+    const dashboardTotalStarsEl = document.getElementById("dashboardTotalStars");
+    const dashboardTotalPRsEl = document.getElementById("dashboardTotalPRs");
+    const dashboardTotalCommitsEl = document.getElementById(
+      "dashboardTotalCommits"
+    );
 
-  members.forEach((member) => {
-    if (member.githubActivity) {
-      totalRepos +=
-        (member.githubActivity.publicRepos || 0) +
-        (member.githubActivity.privateRepos || 0);
-      totalStars += member.githubActivity.totalStars || 0;
-      totalPRs += member.githubActivity.pullRequests || 0;
-      totalCommits +=
-        member.githubActivity.commits !== undefined &&
-        member.githubActivity.commits !== null
-          ? member.githubActivity.commits
-          : 0;
-    }
-  });
-
-  // Update stat elements
-  const totalMembersEl = document.getElementById("totalMembers");
-  const dashboardTotalReposEl = document.getElementById("dashboardTotalRepos");
-  const dashboardTotalStarsEl = document.getElementById("dashboardTotalStars");
-  const dashboardTotalPRsEl = document.getElementById("dashboardTotalPRs");
-  const dashboardTotalCommitsEl = document.getElementById(
-    "dashboardTotalCommits"
-  );
-
-  if (totalMembersEl) totalMembersEl.textContent = formatNumber(total);
-  if (dashboardTotalReposEl)
-    dashboardTotalReposEl.textContent = formatNumber(totalRepos);
-  if (dashboardTotalStarsEl)
-    dashboardTotalStarsEl.textContent = formatNumber(totalStars);
-  if (dashboardTotalPRsEl)
-    dashboardTotalPRsEl.textContent = formatNumber(totalPRs);
-  if (dashboardTotalCommitsEl)
-    dashboardTotalCommitsEl.textContent = formatNumber(totalCommits);
+    if (totalMembersEl) totalMembersEl.textContent = formatNumber(stats.totalMembers);
+    if (dashboardTotalReposEl)
+      dashboardTotalReposEl.textContent = formatNumber(stats.totalRepos);
+    if (dashboardTotalStarsEl)
+      dashboardTotalStarsEl.textContent = formatNumber(stats.totalStars);
+    if (dashboardTotalPRsEl)
+      dashboardTotalPRsEl.textContent = formatNumber(stats.totalPRs);
+    if (dashboardTotalCommitsEl)
+      dashboardTotalCommitsEl.textContent = formatNumber(stats.totalCommits);
+  } catch (error) {
+    handleError(error, { module: 'dashboard', action: 'updateDashboardStats' });
+  }
 }
 
 /**
- * Load dashboard charts
- * @param {Array} members - Array of member objects
+ * Load and render dashboard charts
+ * Creates PR trends chart using Chart.js
+ * @param {Array<Object>} members - Array of member objects
+ * @returns {void}
  */
 function loadDashboardCharts(members) {
   // PR Trends Chart
@@ -131,9 +128,10 @@ function loadDashboardCharts(members) {
 
 /**
  * Get PR trends data for the last N days
- * @param {Array} members - Array of member objects
+ * Uses recentPRs timestamps if available, otherwise distributes evenly
+ * @param {Array<Object>} members - Array of member objects
  * @param {number} days - Number of days (default: 30)
- * @returns {Array} - Array of PR counts per day
+ * @returns {Array<number>} - Array of PR counts per day
  */
 function getPRTrendsData(members, days = 30) {
   // Prefer recentPRs timestamps if available; else even distribution fallback
@@ -175,36 +173,14 @@ function getPRTrendsData(members, days = 30) {
   return buckets;
 }
 
-/**
- * Get top committers by commits
- * @param {Array} members - Array of member objects
- * @returns {Array} - Top committers array
- */
-function getTopCommitters(members) {
-  return members
-    .filter(
-      (member) =>
-        member.githubActivity &&
-        member.githubActivity.commits !== undefined &&
-        member.githubActivity.commits !== null
-    )
-    .map((member) => ({
-      name:
-        member.displayName ||
-        `${member.firstName || ""} ${member.lastName || ""}`.trim() ||
-        "Unknown",
-      commits: member.githubActivity.commits || 0,
-    }))
-    .sort((a, b) => b.commits - a.commits)
-    .slice(0, 10);
-}
+// getTopCommitters is now imported from stats-service.js
 
 /**
  * Load top committers list
  * @param {Array} members - Array of member objects
  */
 function loadTopCommitters(members) {
-  const committers = getTopCommitters(members);
+  const committers = getTopCommitters(members, 10);
   const committersList = document.getElementById("dashboardTopCommitters");
 
   if (!committersList) return;

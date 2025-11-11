@@ -1,0 +1,97 @@
+name: Performance Check
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  performance:
+    name: Performance Metrics
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Check bundle size
+        run: |
+          echo "📦 Checking bundle size..."
+          
+          # Count JavaScript files
+          js_files=$(find js -name "*.js" -type f 2>/dev/null | wc -l || echo "0")
+          echo "✅ Found $js_files JavaScript files"
+          
+          # Estimate total size (rough calculation)
+          total_size=$(find js -name "*.js" -type f -exec wc -c {} + 2>/dev/null | tail -1 | awk '{print $1}' || echo "0")
+          
+          if [ "$total_size" -gt 0 ]; then
+            size_kb=$((total_size / 1024))
+            echo "📊 Total JavaScript size: ~${size_kb} KB"
+            
+            if [ "$size_kb" -gt 500 ]; then
+              echo "⚠️  Warning: JavaScript bundle is large (>500KB)"
+              echo "Consider code splitting or lazy loading"
+            else
+              echo "✅ JavaScript bundle size is reasonable"
+            fi
+          fi
+      
+      - name: Check for large dependencies
+        run: |
+          echo "📦 Checking dependencies..."
+          
+          if [ -f package.json ]; then
+            echo "✅ package.json found"
+            
+            # Check for heavy dependencies
+            if grep -q "chart.js" package.json || grep -q "chartjs" package.json; then
+              echo "ℹ️  Chart.js detected - consider tree-shaking or lazy loading"
+            fi
+          fi
+      
+      - name: Check for performance anti-patterns
+        run: |
+          echo "🔍 Checking for performance anti-patterns..."
+          
+          # Check for synchronous operations in loops
+          sync_ops=$(grep -r "await.*for\|for.*await" js/ --include="*.js" 2>/dev/null | wc -l || echo "0")
+          
+          if [ "$sync_ops" -gt 0 ]; then
+            echo "⚠️  Found potential synchronous operations in loops"
+            echo "Consider using Promise.all for parallel operations"
+          else
+            echo "✅ No obvious synchronous loop patterns found"
+          fi
+          
+          # Check for excessive DOM queries
+          dom_queries=$(grep -r "getElementById\|querySelector" js/ --include="*.js" 2>/dev/null | wc -l || echo "0")
+          echo "ℹ️  Found $dom_queries DOM queries (consider caching selectors)"
+      
+      - name: Performance Summary
+        if: always()
+        run: |
+          echo "## Performance Check Results"
+          echo ""
+          echo "✅ Performance checks completed"
+          echo ""
+          echo "**Checks Performed:**"
+          echo "- Bundle size estimation"
+          echo "- Dependency analysis"
+          echo "- Performance anti-pattern detection"
+          echo ""
+          echo "**Recommendations:**"
+          echo "- Monitor bundle size in production"
+          echo "- Consider lazy loading for heavy modules"
+          echo "- Cache DOM queries when possible"
+          echo "- Use virtual scrolling for large lists"
+

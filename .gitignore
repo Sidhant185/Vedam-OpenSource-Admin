@@ -28,6 +28,12 @@ build/
 *.min.js
 *.min.css
 
+# IMPORTANT: Source files should NEVER contain real credentials
+# They should always have placeholders (VITE_*)
+# - Local dev: Use `npm run dev` (dev server does on-the-fly replacement)
+# - Netlify: Build script modifies source files during deployment only
+# - Always restore placeholders before committing!
+
 # Temporary files
 tmp/
 temp/

@@ -9,6 +9,7 @@
       href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💻</text></svg>"
     />
     <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="styles/responsive.css" />
     <link
       href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
       rel="stylesheet"
@@ -27,19 +28,35 @@
           <h1><i class="fas fa-code"></i> Vedam Open Source</h1>
           <p>Admin Dashboard</p>
         </div>
-        <form id="loginForm" class="login-form">
+        <form id="loginForm" class="login-form" role="form" aria-label="Admin login form">
           <div class="form-group">
             <label for="email">Email</label>
-            <input type="email" id="email" name="email" required />
+            <input 
+              type="email" 
+              id="email" 
+              name="email" 
+              required 
+              autocomplete="email"
+              aria-required="true"
+              aria-label="Email address"
+            />
           </div>
           <div class="form-group">
             <label for="password">Password</label>
-            <input type="password" id="password" name="password" required />
+            <input 
+              type="password" 
+              id="password" 
+              name="password" 
+              required 
+              autocomplete="current-password"
+              aria-required="true"
+              aria-label="Password"
+            />
           </div>
-          <button type="submit" class="login-btn">
-            <i class="fas fa-sign-in-alt"></i> Login
+          <button type="submit" class="login-btn" aria-label="Submit login form">
+            <i class="fas fa-sign-in-alt" aria-hidden="true"></i> Login
           </button>
-          <div id="loginError" class="error-message"></div>
+          <div id="loginError" class="error-message" role="alert" aria-live="polite"></div>
         </form>
       </div>
     </div>
@@ -49,34 +66,44 @@
       <!-- Header -->
       <header class="header">
         <div class="header-left">
-          <button id="sidebarToggle" class="sidebar-toggle">
-            <i class="fas fa-bars"></i>
+          <button 
+            id="sidebarToggle" 
+            class="sidebar-toggle"
+            aria-label="Toggle sidebar navigation"
+            aria-expanded="false"
+            aria-controls="sidebar"
+          >
+            <i class="fas fa-bars" aria-hidden="true"></i>
           </button>
           <h1><i class="fas fa-code"></i> Vedam Open Source Admin</h1>
         </div>
         <div class="header-right">
           <div class="user-info">
             <span id="adminEmail"></span>
-            <button id="logoutBtn" class="logout-btn">
-              <i class="fas fa-sign-out-alt"></i> Logout
+            <button 
+              id="logoutBtn" 
+              class="logout-btn"
+              aria-label="Logout from admin dashboard"
+            >
+              <i class="fas fa-sign-out-alt" aria-hidden="true"></i> Logout
             </button>
           </div>
         </div>
       </header>
 
       <!-- Sidebar -->
-      <nav id="sidebar" class="sidebar">
+      <nav id="sidebar" class="sidebar" role="navigation" aria-label="Main navigation">
         <ul class="nav-menu">
-          <li class="nav-item active" data-page="dashboard">
-            <i class="fas fa-tachometer-alt"></i>
+          <li class="nav-item active" data-page="dashboard" role="menuitem" tabindex="0">
+            <i class="fas fa-tachometer-alt" aria-hidden="true"></i>
             <span>Dashboard</span>
           </li>
-          <li class="nav-item" data-page="members">
-            <i class="fas fa-users"></i>
+          <li class="nav-item" data-page="members" role="menuitem" tabindex="0">
+            <i class="fas fa-users" aria-hidden="true"></i>
             <span>Members</span>
           </li>
-          <li class="nav-item" data-page="analytics">
-            <i class="fas fa-chart-bar"></i>
+          <li class="nav-item" data-page="analytics" role="menuitem" tabindex="0">
+            <i class="fas fa-chart-bar" aria-hidden="true"></i>
             <span>Analytics</span>
           </li>
           <li class="nav-item nav-item-dropdown">
@@ -240,11 +267,13 @@
 
           <div class="filters-section">
             <div class="search-box">
-              <i class="fas fa-search"></i>
+              <i class="fas fa-search" aria-hidden="true"></i>
               <input
                 type="text"
                 id="memberSearch"
                 placeholder="Search by name, GitHub username..."
+                aria-label="Search members by name or GitHub username"
+                autocomplete="off"
               />
               <button
                 id="clearSearch"

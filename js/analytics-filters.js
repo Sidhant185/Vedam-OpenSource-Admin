@@ -1,6 +1,6 @@
 // Analytics Filters Module
 import { getMembers } from './data-store.js';
-import { formatNumber } from './utils.js';
+import { formatNumber, debounce } from './utils.js';
 
 let analyticsSearch, analyticsLanguageFilter, analyticsActivityFilter, analyticsDateRange, clearAnalyticsSearchBtn;
 let filteredContributors = [];
@@ -16,13 +16,23 @@ export function initializeAnalyticsFilters() {
     analyticsDateRange = document.getElementById('analyticsDateRange');
     clearAnalyticsSearchBtn = document.getElementById('clearAnalyticsSearch');
 
-    // Set up event listeners
+    // Set up event listeners with debouncing for search
     if (analyticsSearch) {
-        analyticsSearch.addEventListener('input', () => {
+        // Debounce search input to avoid excessive filtering
+        const debouncedFilter = debounce(() => {
             applyAnalyticsFilters();
             if (clearAnalyticsSearchBtn) {
                 clearAnalyticsSearchBtn.style.display = analyticsSearch.value ? 'block' : 'none';
             }
+        }, 300);
+        
+        analyticsSearch.addEventListener('input', () => {
+            // Show clear button immediately
+            if (clearAnalyticsSearchBtn) {
+                clearAnalyticsSearchBtn.style.display = analyticsSearch.value ? 'block' : 'none';
+            }
+            // Debounce the actual filtering
+            debouncedFilter();
         });
     }
 

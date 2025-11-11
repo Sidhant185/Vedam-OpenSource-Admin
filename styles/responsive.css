@@ -1,0 +1,310 @@
+/**
+ * Responsive Design Styles
+ * Mobile-first approach with breakpoints for tablet and desktop
+ */
+
+/* Mobile First - Base styles are for mobile */
+
+/* Tablet and up (768px) */
+@media (min-width: 768px) {
+    .sidebar {
+        width: 200px;
+        /* Sidebar hidden by default, shown when .open class is added */
+    }
+    
+    .dashboard.sidebar-open {
+        margin-left: 200px;
+    }
+    
+    .dashboard.sidebar-open .main-content {
+        margin-left: 0;
+    }
+    
+    .dashboard.sidebar-open .header {
+        left: 200px;
+        right: 0;
+    }
+    
+    .sidebar-toggle {
+        display: flex; /* Show toggle button on all screen sizes */
+    }
+    
+    .members-table {
+        font-size: 0.9rem;
+    }
+    
+    .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+/* Desktop and up (1024px) */
+@media (min-width: 1024px) {
+    .stats-grid {
+        grid-template-columns: repeat(4, 1fr);
+    }
+    
+    .members-table {
+        font-size: 1rem;
+    }
+    
+    .dashboard-content {
+        padding: 2rem;
+    }
+    
+    .filters-section {
+        flex-direction: row;
+        gap: 1rem;
+    }
+}
+
+/* Large Desktop (1440px) */
+@media (min-width: 1440px) {
+    .dashboard-content {
+        max-width: 1400px;
+        margin: 0 auto;
+    }
+}
+
+/* Mobile specific styles (max-width: 767px) */
+@media (max-width: 767px) {
+    /* Header adjustments */
+    .header {
+        padding: 1rem;
+        flex-wrap: wrap;
+    }
+    
+    .header h1 {
+        font-size: 1.2rem;
+    }
+    
+    .user-info {
+        font-size: 0.85rem;
+    }
+    
+    /* Sidebar mobile */
+    .sidebar {
+        width: 100%;
+        transform: translateX(-100%) !important;
+        transition: transform 0.3s ease;
+    }
+    
+    .sidebar.open {
+        transform: translateX(0) !important;
+    }
+    
+    .dashboard {
+        margin-left: 0;
+    }
+    
+    .sidebar-toggle {
+        display: block;
+    }
+    
+    /* Dashboard content */
+    .dashboard-content {
+        padding: 1rem;
+    }
+    
+    .stats-grid {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+    
+    .stat-card {
+        padding: 1rem;
+    }
+    
+    /* Members table mobile */
+    .members-table-wrapper {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    
+    .members-table {
+        min-width: 800px;
+        font-size: 0.85rem;
+    }
+    
+    .members-table th,
+    .members-table td {
+        padding: 0.5rem;
+    }
+    
+    /* Filters mobile */
+    .filters-section {
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+    
+    .search-box {
+        width: 100%;
+    }
+    
+    .filter-controls {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+    
+    .filter-controls select {
+        width: 100%;
+    }
+    
+    /* Forms mobile */
+    .forms-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .form-card {
+        margin-bottom: 1rem;
+    }
+    
+    /* Charts mobile */
+    .chart-container {
+        height: 250px;
+    }
+    
+    /* Buttons mobile */
+    .btn {
+        padding: 0.75rem 1rem;
+        font-size: 0.9rem;
+    }
+    
+    /* Modal mobile */
+    .modal-content {
+        width: 95%;
+        max-width: 95%;
+        margin: 1rem auto;
+        max-height: 90vh;
+        overflow-y: auto;
+    }
+    
+    /* Navigation mobile */
+    .nav-menu {
+        padding: 0.5rem;
+    }
+    
+    .nav-item {
+        padding: 0.75rem;
+        font-size: 0.9rem;
+    }
+    
+    /* Login screen mobile */
+    .login-container {
+        margin: 1rem;
+        padding: 1.5rem;
+    }
+    
+    /* Pagination mobile */
+    .pagination {
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+    
+    .pagination button {
+        padding: 0.5rem 0.75rem;
+        font-size: 0.85rem;
+    }
+}
+
+/* Small mobile (max-width: 480px) */
+@media (max-width: 480px) {
+    .header h1 {
+        font-size: 1rem;
+    }
+    
+    .stat-card h3 {
+        font-size: 0.9rem;
+    }
+    
+    .stat-card .stat-value {
+        font-size: 1.5rem;
+    }
+    
+    .members-table {
+        font-size: 0.75rem;
+        min-width: 700px;
+    }
+    
+    .btn {
+        padding: 0.6rem 0.8rem;
+        font-size: 0.85rem;
+    }
+    
+    .modal-content {
+        padding: 1rem;
+    }
+}
+
+/* Touch device optimizations */
+@media (hover: none) and (pointer: coarse) {
+    /* Increase touch target sizes */
+    .btn,
+    .nav-item,
+    button {
+        min-height: 44px;
+        min-width: 44px;
+    }
+    
+    /* Remove hover effects on touch devices */
+    .btn:hover {
+        transform: none;
+    }
+    
+    /* Improve scrolling */
+    * {
+        -webkit-overflow-scrolling: touch;
+    }
+}
+
+/* Print styles */
+@media print {
+    .sidebar,
+    .header,
+    .sidebar-toggle,
+    .btn,
+    .filters-section,
+    .pagination {
+        display: none !important;
+    }
+    
+    .dashboard {
+        margin-left: 0;
+    }
+    
+    .dashboard-content {
+        padding: 0;
+    }
+    
+    .members-table {
+        font-size: 0.8rem;
+    }
+    
+    .page-break {
+        page-break-after: always;
+    }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+    .stat-card,
+    .card {
+        border: 2px solid currentColor;
+    }
+    
+    .btn {
+        border: 2px solid currentColor;
+    }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}
+

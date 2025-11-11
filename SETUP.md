@@ -15,18 +15,36 @@ cp .env.example .env
 ## Step 3: Get Firebase Credentials
 
 1. Go to [Firebase Console](https://console.firebase.google.com/)
-2. Select your project: **vedamopensource007**
+2. Select your project (or create a new one)
 3. Go to Project Settings (gear icon) → General tab
 4. Scroll to "Your apps" section
 5. Copy the config values to your `.env` file
 
-**Get values from Firebase Console:**
-- Go to Project Settings → General
-- Scroll to "Your apps" section
-- Copy the configuration values
-- **Note**: These are example values - use your own Firebase project credentials
+**Required Firebase values:**
+- `VITE_FIREBASE_API_KEY` - API Key
+- `VITE_FIREBASE_AUTH_DOMAIN` - Auth Domain
+- `VITE_FIREBASE_PROJECT_ID` - Project ID
+- `VITE_FIREBASE_STORAGE_BUCKET` - Storage Bucket
+- `VITE_FIREBASE_MESSAGING_SENDER_ID` - Messaging Sender ID
+- `VITE_FIREBASE_APP_ID` - App ID
+- `VITE_FIREBASE_MEASUREMENT_ID` - Measurement ID (for Analytics)
 
-## Step 4: Get GitHub Token (Optional but Recommended)
+**Note**: All values should be prefixed with `VITE_` for the build script to recognize them.
+
+## Step 4: Set Admin Email
+
+Add your admin email to `.env`:
+
+```env
+VITE_ADMIN_EMAIL=your-admin-email@example.com
+```
+
+**Important**: 
+- This email must be registered in Firebase Auth
+- You can also manage admins via Firestore `admins` collection (email as document ID, `isAdmin: true`)
+- The system checks Firestore first, then falls back to environment variable
+
+## Step 5: Get GitHub Token (Optional but Recommended)
 
 1. Go to [GitHub Settings → Tokens](https://github.com/settings/tokens)
 2. Click "Generate new token (classic)"
@@ -42,7 +60,7 @@ cp .env.example .env
 
 ⚠️ **IMPORTANT**: Never commit your token to git!
 
-## Step 5: Build and Test
+## Step 6: Build and Test
 
 ```bash
 # Build (injects environment variables)
@@ -54,7 +72,7 @@ npm run dev
 
 Open `http://localhost:8000` in your browser.
 
-## Step 6: Push to GitHub
+## Step 7: Push to GitHub
 
 ```bash
 # Initialize git (if not done)
@@ -74,7 +92,7 @@ git branch -M main
 git push -u origin main
 ```
 
-## Step 7: Deploy to Netlify
+## Step 8: Deploy to Netlify
 
 ### Via Netlify UI:
 
@@ -85,7 +103,16 @@ git push -u origin main
    - Build command: `npm install && npm run build`
    - Publish directory: `.`
 5. Add environment variables (Site settings → Environment variables):
-   - Add all `VITE_*` variables from your `.env` file
+   - Add all `VITE_*` variables from your `.env` file:
+     - `VITE_FIREBASE_API_KEY`
+     - `VITE_FIREBASE_AUTH_DOMAIN`
+     - `VITE_FIREBASE_PROJECT_ID`
+     - `VITE_FIREBASE_STORAGE_BUCKET`
+     - `VITE_FIREBASE_MESSAGING_SENDER_ID`
+     - `VITE_FIREBASE_APP_ID`
+     - `VITE_FIREBASE_MEASUREMENT_ID`
+     - `VITE_ADMIN_EMAIL` (required)
+     - `VITE_GITHUB_TOKEN` (optional but recommended)
 6. Deploy!
 
 ### Via CLI:

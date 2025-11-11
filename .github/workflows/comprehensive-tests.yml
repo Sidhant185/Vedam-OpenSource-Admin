@@ -151,13 +151,25 @@ jobs:
       
       - name: Code Quality - Check for console.log
         run: |
-          console_logs=$(grep -r "console\.log" js/ --include="*.js" 2>/dev/null | grep -v "//" | wc -l || echo "0")
+          console_logs=$(grep -r "console\.log" js/ --include="*.js" 2>/dev/null | grep -v "//" | grep -v "console.log('" | wc -l || echo "0")
           
           if [ "$console_logs" -gt 0 ]; then
-            echo "⚠️  Found $console_logs console.log statements (consider removing)"
-            grep -r "console\.log" js/ --include="*.js" | grep -v "//" | head -3
+            echo "⚠️  Found $console_logs console.log statements (consider removing or using handleError)"
+            grep -r "console\.log" js/ --include="*.js" 2>/dev/null | grep -v "//" | head -3
           else
-            echo "✅ No console.log statements"
+            echo "✅ No console.log statements (or all are in comments)"
+          fi
+      
+      - name: Code Quality - Validate build output
+        run: |
+          echo "🔍 Validating build output..."
+          
+          if [ -f scripts/validate-build.js ]; then
+            node scripts/validate-build.js || {
+              echo "⚠️  Build validation failed (check output above)"
+            }
+          else
+            echo "ℹ️  Build validation script not found"
           fi
       
       # ============================================

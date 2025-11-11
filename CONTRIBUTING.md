@@ -1,219 +1,152 @@
-# Contributing Guide
+# Contributing to Vedam Open Source Admin Dashboard
 
-Thank you for your interest in contributing to Vedam Open Source Admin Dashboard! 🎉
+Thank you for your interest in contributing! This document provides guidelines and instructions for contributing to the project.
 
-## Getting Started
+## Development Setup
 
-### 1. Fork and Clone
+1. **Clone the repository**
+   ```bash
+   git clone <repository-url>
+   cd "Vedam Open Admin copy"
+   ```
 
-```bash
-# Fork the repository on GitHub
-# Then clone your fork
-git clone https://github.com/your-username/vedam-open-admin.git
-cd vedam-open-admin
-```
+2. **Install dependencies**
+   ```bash
+   npm install
+   ```
 
-### 2. Setup Development Environment
+3. **Set up environment variables**
+   ```bash
+   cp .env.example .env
+   # Edit .env and add your credentials
+   ```
 
-```bash
-# Install dependencies
-npm install
-
-# Create environment file
-cp .env.example .env
-
-# Edit .env with your test credentials
-# (Use a separate Firebase project for testing)
-```
-
-### 3. Create a Branch
-
-```bash
-# Create a feature branch
-git checkout -b feature/your-feature-name
-
-# Or for bug fixes
-git checkout -b fix/your-bug-fix
-```
-
-## Development Workflow
-
-### Making Changes
-
-1. **Make your changes** in the codebase
-2. **Test locally**:
+4. **Run build script**
    ```bash
    npm run build
+   ```
+
+5. **Start development server**
+   ```bash
    npm run dev
    ```
-3. **Follow the testing checklist** in `TESTING.md`
-4. **Commit your changes**:
-   ```bash
-   git add .
-   git commit -m "Description of your changes"
-   ```
 
-### Commit Message Guidelines
+## Code Style Guidelines
 
-Use clear, descriptive commit messages:
+### JavaScript
 
-- ✅ Good: `feat: Add dark mode toggle to settings`
-- ✅ Good: `fix: Resolve scroll issue in form builder`
-- ❌ Bad: `update`
-- ❌ Bad: `fix bug`
+- Use ES6+ features (modules, async/await, arrow functions)
+- Follow consistent naming conventions:
+  - Functions: `camelCase`
+  - Constants: `UPPER_SNAKE_CASE`
+  - Classes: `PascalCase`
+- Add JSDoc comments for all exported functions
+- Use centralized error handling (`handleError` from `utils.js`)
+- Avoid `console.log` in production code (use `handleError` or remove)
 
-### Before Submitting PR
+### File Organization
 
-Run these checks:
+- Keep files focused on a single responsibility
+- Use modules for code organization
+- Place utilities in `js/utils/`
+- Place services in `js/services/`
+- Keep functions small and focused
 
-```bash
-# Build the project
-npm run build
+### Error Handling
 
-# Test locally
-npm run dev
+- Always use try-catch for async operations
+- Use `handleError` from `utils.js` for error reporting
+- Provide user-friendly error messages
+- Log errors with context (module, action, user)
 
-# Check for hardcoded secrets
-grep -r "AIzaSy\|ghp_" --include="*.js" --exclude-dir=node_modules
+### Performance
 
-# Verify .env is not committed
-git status | grep .env
-```
+- Debounce search inputs (300ms default)
+- Use document fragments for batch DOM updates
+- Cache DOM queries when possible
+- Avoid unnecessary API calls
+- Use virtual scrolling for large lists
 
 ## Pull Request Process
 
-### 1. Create Pull Request
+1. **Create a feature branch**
+   ```bash
+   git checkout -b feature/your-feature-name
+   ```
 
-1. Push your branch to your fork:
+2. **Make your changes**
+   - Follow code style guidelines
+   - Add JSDoc comments
+   - Update documentation if needed
+
+3. **Test your changes**
+   - Test locally with `npm run dev`
+   - Run build validation: `npm run build:validate`
+   - Check for linting errors
+
+4. **Commit your changes**
+   ```bash
+   git add .
+   git commit -m "feat: add your feature description"
+   ```
+
+5. **Push and create PR**
    ```bash
    git push origin feature/your-feature-name
    ```
 
-2. Go to GitHub and create a Pull Request
-3. Fill out the PR template completely
-4. Link any related issues
+6. **Wait for CI/CD checks**
+   - Security scan
+   - Build validation
+   - Accessibility check
+   - Performance check
 
-### 2. Automatic Checks
+## Commit Message Format
 
-When you create a PR, these happen automatically:
+Use conventional commits format:
 
-- ✅ **GitHub Actions** run tests
-- ✅ **Netlify** creates a preview deployment
-- ✅ **Code quality** checks run
+- `feat:` - New feature
+- `fix:` - Bug fix
+- `docs:` - Documentation changes
+- `style:` - Code style changes (formatting, etc.)
+- `refactor:` - Code refactoring
+- `perf:` - Performance improvements
+- `test:` - Adding tests
+- `chore:` - Maintenance tasks
 
-### 3. Preview Deployment
-
-- **Automatic**: Preview deployment is created automatically
-- **No approval needed**: Preview deployments don't require approval
-- **URL provided**: Netlify comment will appear on your PR with preview URL
-- **Live demo**: You can share the preview URL for testing
-
-### 4. Review Process
-
-1. **Automated checks must pass** (GitHub Actions)
-2. **Code review** by maintainers
-3. **Address feedback** if any
-4. **Update PR** as needed
-
-### 5. Merge and Deploy
-
-- **After merge**: PR is merged to `main` branch
-- **Automatic production deploy**: Netlify automatically deploys to production
-- **No manual steps**: Everything is automatic
-
-## Testing Requirements
-
-Before submitting a PR, ensure:
-
-- [ ] All tests in `TESTING.md` pass
-- [ ] Code works in multiple browsers
-- [ ] No console errors
-- [ ] No hardcoded secrets
-- [ ] Build script works
-- [ ] Preview deployment works
-
-See `TESTING.md` for complete testing checklist.
-
-## Code Style
-
-### JavaScript
-
-- Use ES6+ features
-- Use meaningful variable names
-- Add comments for complex logic
-- Remove `console.log` statements
-- Handle errors properly
-
-### CSS
-
-- Use consistent naming (BEM or similar)
-- Organize styles logically
-- Use CSS variables for colors
-- Make it responsive
-
-### HTML
-
-- Use semantic HTML
-- Add alt text to images
-- Proper heading hierarchy
-- Accessible forms
-
-## Project Structure
-
+Example:
 ```
-.
-├── index.html          # Main dashboard
-├── forms.html          # Forms management
-├── firebase-config.js  # Firebase setup
-├── js/                 # JavaScript modules
-├── styles.css          # Global styles
-├── build.js            # Build script
-├── package.json        # Dependencies
-└── netlify.toml        # Netlify config
+feat: add virtual scrolling to members table
+fix: resolve GitHub API rate limiting issue
+docs: update README with new features
 ```
 
-## Environment Variables
+## Testing
 
-Never commit `.env` file! Always use `.env.example` as template.
+- Write tests for new features (when testing framework is set up)
+- Test error scenarios
+- Test edge cases
+- Verify accessibility
 
-Required variables:
-- `VITE_FIREBASE_API_KEY`
-- `VITE_FIREBASE_AUTH_DOMAIN`
-- `VITE_FIREBASE_PROJECT_ID`
-- `VITE_FIREBASE_STORAGE_BUCKET`
-- `VITE_FIREBASE_MESSAGING_SENDER_ID`
-- `VITE_FIREBASE_APP_ID`
-- `VITE_FIREBASE_MEASUREMENT_ID`
-- `VITE_GITHUB_TOKEN` (optional)
+## Security
 
-## Security Guidelines
+- **Never commit secrets or credentials**
+- Use environment variables for all sensitive data
+- Follow security best practices
+- Report security issues privately
 
-- ❌ **Never** commit secrets or API keys
-- ❌ **Never** hardcode credentials
-- ✅ **Always** use environment variables
-- ✅ **Always** check `.gitignore` includes `.env`
-- ✅ **Always** test with test credentials
+## Documentation
 
-## Getting Help
+- Update README.md for user-facing changes
+- Update IMPROVEMENTS.md for significant improvements
+- Add JSDoc comments for new functions
+- Update type definitions in `js/types.js` if needed
 
-- **Questions?** Open a discussion
-- **Found a bug?** Open an issue
-- **Security issue?** Contact maintainers privately
-- **Need clarification?** Comment on the PR
+## Questions?
 
-## Recognition
+If you have questions, please:
+1. Check existing documentation (README.md, SETUP.md)
+2. Review existing code for patterns
+3. Open an issue for discussion
 
-Contributors will be:
-- Listed in README.md
-- Credited in release notes
-- Appreciated by the community! 🙏
-
-## Code of Conduct
-
-- Be respectful
-- Be constructive
-- Help others learn
-- Follow project guidelines
-
-Thank you for contributing! 🚀
-
+Thank you for contributing! 🎉

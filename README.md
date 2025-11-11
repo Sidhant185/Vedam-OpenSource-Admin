@@ -6,12 +6,17 @@ A comprehensive admin dashboard for managing members, forms, analytics, and GitH
 
 ## Features
 
-- 🔐 **Authentication**: Secure login with Firebase Auth
-- 👥 **Member Management**: Track and manage organization members
+- 🔐 **Secure Authentication**: Firebase Auth with Firestore-based admin management
+- 👥 **Member Management**: Track and manage organization members with advanced filtering and pagination
 - 📝 **Form Builder**: Create and manage dynamic forms with advanced field types
-- 📊 **Analytics**: View detailed analytics and insights
-- 🔗 **GitHub Integration**: Fetch and display GitHub user data
-- 📈 **Dashboard**: Overview of organization statistics
+- 📊 **Analytics**: View detailed analytics and insights with charts and statistics
+- 🔗 **GitHub Integration**: Fetch and display GitHub user data with intelligent caching and rate limiting
+- 📈 **Dashboard**: Overview of organization statistics and trends
+- ⚡ **Performance Optimized**: Debounced search, virtual scrolling, request deduplication, exponential backoff
+- ♿ **Accessible**: ARIA labels, keyboard navigation, screen reader support, high contrast mode
+- 🛡️ **Secure**: Environment-based configuration, no hardcoded credentials, automated security scanning
+- 📱 **Responsive**: Mobile-first design with comprehensive breakpoints and touch optimizations
+- 🔄 **CI/CD**: Automated testing, security scanning, accessibility checks, and performance monitoring
 
 ## Tech Stack
 
@@ -19,12 +24,41 @@ A comprehensive admin dashboard for managing members, forms, analytics, and GitH
 - **Backend**: Firebase (Firestore, Auth, Analytics)
 - **Styling**: Custom CSS
 - **Deployment**: Netlify
+- **Architecture**: Modular design with service layer, centralized error handling, and type definitions
+
+## Project Structure
+
+```
+├── js/
+│   ├── app.js                 # Main application entry point
+│   ├── auth.js                # Authentication module
+│   ├── data-store.js          # Firebase data management with caching
+│   ├── github-api.js          # GitHub API integration
+│   ├── github-refresh.js      # Background GitHub data refresh
+│   ├── navigation.js          # Navigation and routing
+│   ├── dashboard.js           # Dashboard page
+│   ├── members.js             # Members management page
+│   ├── analytics.js           # Analytics page
+│   ├── forms.js               # Forms management
+│   ├── services/
+│   │   ├── stats-service.js   # Centralized statistics calculations
+│   │   └── loading-service.js # Loading state management
+│   ├── utils/
+│   │   ├── calculations.js    # Calculation utilities
+│   │   └── virtual-scroll.js  # Virtual scrolling utility
+│   └── types.js               # Type definitions (JSDoc)
+├── firebase-config.js         # Firebase configuration
+├── build.js                   # Build script for environment injection
+├── .env.example              # Environment variables template
+└── index.html                # Main HTML file
+```
 
 ## Prerequisites
 
 - Node.js 18+ (for local development)
 - Firebase project
-- GitHub Personal Access Token (optional, for enhanced API limits)
+- GitHub Personal Access Token (optional, but recommended for enhanced API limits - 5,000 req/hour vs 60 req/hour)
+- Admin email registered in Firebase Auth
 
 ## Setup Instructions
 
@@ -54,6 +88,9 @@ VITE_FIREBASE_STORAGE_BUCKET=your_project.firebasestorage.app
 VITE_FIREBASE_MESSAGING_SENDER_ID=your_messaging_sender_id
 VITE_FIREBASE_APP_ID=your_app_id
 VITE_FIREBASE_MEASUREMENT_ID=your_measurement_id
+
+# Admin Email (must be registered in Firebase Auth)
+VITE_ADMIN_EMAIL=admin@example.com
 
 # GitHub API Token (optional but recommended)
 VITE_GITHUB_TOKEN=your_github_personal_access_token
@@ -97,6 +134,8 @@ http-server -p 8000
 - Right-click on `index.html` → "Open with Live Server"
 
 Then open `http://localhost:8000` in your browser.
+
+**Note**: For environment variables to work locally, run `npm run build` after setting up your `.env` file. The build script will inject environment variables into the source files.
 
 **Note**: For environment variables to work locally, you'll need a build tool or use a simple script to inject them. See "Environment Variables in Static Site" section below.
 

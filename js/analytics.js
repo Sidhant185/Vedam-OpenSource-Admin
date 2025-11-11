@@ -1,7 +1,19 @@
+/**
+ * @fileoverview Analytics Page Module
+ * Handles analytics display, charts, and data visualization
+ * @module analytics
+ */
+
 // Analytics Page Module
 import { getMembers } from "./data-store.js";
-import { formatNumber, showLoading, hideLoading } from "./utils.js";
+import { formatNumber, showLoading, hideLoading, handleError } from "./utils.js";
 import { fetchGitHubUserInfo } from "./github-api.js";
+import { 
+  calculateAnalyticsStats, 
+  calculateRepositoryStats, 
+  getTopCommitters, 
+  getTopPRCreators 
+} from "./services/stats-service.js";
 
 let repoChart = null;
 let languageChart = null;
@@ -23,7 +35,7 @@ export async function loadAnalytics() {
     loadPRActivityChart(members);
     loadLanguageStatistics(members);
   } catch (error) {
-    console.error("Error loading analytics:", error);
+    handleError(error, { module: 'analytics', action: 'loadAnalytics' });
   } finally {
     hideLoading();
   }
@@ -34,15 +46,37 @@ export async function loadAnalytics() {
  * @param {Array} members - Array of member objects
  */
 async function loadAnalyticsCharts(members) {
-  // Repository statistics chart
-  const repoCtx = document.getElementById("repoChart");
-  if (repoCtx && repoChart) {
-    repoChart.destroy();
+  // Check if Chart.js is available
+  if (typeof Chart === 'undefined') {
+    console.error('Chart.js is not loaded. Please ensure Chart.js is included in the page.');
+    return;
   }
 
-  if (repoCtx) {
-    const repoData = await getRepositoryData(members);
-    repoChart = new Chart(repoCtx, {
+  // Repository statistics chart
+  const repoCtx = document.getElementById("repoChart");
+  if (!repoCtx) {
+    console.warn('Repository chart container not found');
+  } else {
+    try {
+      if (repoChart) {
+        repoChart.destroy();
+        repoChart = null;
+      }
+
+      // Use centralized repository stats calculation
+      const repoData = calculateRepositoryStats(members);
+      
+      // Validate data
+      const chartData = [
+        repoData.public || 0,
+        repoData.private || 0,
+        repoData.stars || 0,
+        repoData.forks || 0,
+        repoData.prs || 0,
+        repoData.commits || 0,
+      ];
+
+      repoChart = new Chart(repoCtx, {
       type: "bar",
       data: {
         labels: [
@@ -56,14 +90,7 @@ async function loadAnalyticsCharts(members) {
         datasets: [
           {
             label: "Count",
-            data: [
-              repoData.public,
-              repoData.private,
-              repoData.stars,
-              repoData.forks,
-              repoData.prs,
-              repoData.commits,
-            ],
+            data: chartData,
             backgroundColor: [
               "#667eea",
               "#764ba2",
@@ -105,17 +132,33 @@ async function loadAnalyticsCharts(members) {
         },
       },
     });
+    } catch (error) {
+      console.error('Error creating repository chart:', error);
+      handleError(error, { module: 'analytics', action: 'loadAnalyticsCharts', chart: 'repoChart' });
+    }
   }
 
   // Language distribution chart
   const languageCtx = document.getElementById("languageChart");
-  if (languageCtx && languageChart) {
-    languageChart.destroy();
-  }
+  if (!languageCtx) {
+    console.warn('Language chart container not found');
+  } else {
+    try {
+      if (languageChart) {
+        languageChart.destroy();
+        languageChart = null;
+      }
 
-  if (languageCtx) {
-    const languageData = getLanguageData(members);
-    languageChart = new Chart(languageCtx, {
+      const languageData = getLanguageData(members);
+
+      // Validate language data
+      if (!languageData || !languageData.labels || !languageData.data || 
+          languageData.labels.length === 0 || languageData.data.length === 0) {
+        console.warn('No language data available for chart');
+        return;
+      }
+
+      languageChart = new Chart(languageCtx, {
       type: "pie",
       data: {
         labels:
@@ -168,6 +211,10 @@ async function loadAnalyticsCharts(members) {
         },
       },
     });
+    } catch (error) {
+      console.error('Error creating language chart:', error);
+      handleError(error, { module: 'analytics', action: 'loadAnalyticsCharts', chart: 'languageChart' });
+    }
   }
 }
 
@@ -176,7 +223,7 @@ async function loadAnalyticsCharts(members) {
  * @param {Array} members - Array of member objects
  */
 function loadTopCommitters(members) {
-  const committers = getTopCommitters(members);
+  const committers = getTopCommitters(members, 10);
   const committersList = document.getElementById("topCommitters");
 
   if (!committersList) return;
@@ -215,7 +262,7 @@ function loadTopCommitters(members) {
  * @param {Array} members - Array of member objects
  */
 function loadTopPRCreators(members) {
-  const prCreators = getTopPRCreators(members);
+  const prCreators = getTopPRCreators(members, 10);
   const prCreatorsList = document.getElementById("topPRCreators");
 
   if (!prCreatorsList) return;
@@ -258,88 +305,37 @@ function loadTopPRCreators(members) {
 
 /**
  * Update activity statistics
+ * Uses centralized stats service for consistent calculations
  * @param {Array} members - Array of member objects
  */
 function updateActivityStats(members) {
-  const stats = getActivityStats(members);
+  try {
+    // Use centralized stats calculation
+    const stats = calculateAnalyticsStats(members);
 
-  const totalReposEl = document.getElementById("totalRepos");
-  const totalStarsEl = document.getElementById("totalStars");
-  const avgReposEl = document.getElementById("avgRepos");
-  const totalPRsEl = document.getElementById("totalPRs");
-  const totalCommitsEl = document.getElementById("totalCommits");
-  const totalIssuesEl = document.getElementById("totalIssues");
-  const avgStarsEl = document.getElementById("avgStars");
+    const totalReposEl = document.getElementById("totalRepos");
+    const totalStarsEl = document.getElementById("totalStars");
+    const avgReposEl = document.getElementById("avgRepos");
+    const totalPRsEl = document.getElementById("totalPRs");
+    const totalCommitsEl = document.getElementById("totalCommits");
+    const totalIssuesEl = document.getElementById("totalIssues");
+    const avgStarsEl = document.getElementById("avgStars");
 
-  if (totalReposEl) totalReposEl.textContent = formatNumber(stats.totalRepos);
-  if (totalStarsEl) totalStarsEl.textContent = formatNumber(stats.totalStars);
-  if (avgReposEl) avgReposEl.textContent = formatNumber(stats.avgRepos);
-  if (totalPRsEl) totalPRsEl.textContent = formatNumber(stats.totalPRs);
-  if (totalCommitsEl)
-    totalCommitsEl.textContent = formatNumber(stats.totalCommits);
-  if (totalIssuesEl)
-    totalIssuesEl.textContent = formatNumber(stats.totalIssues);
-  if (avgStarsEl) avgStarsEl.textContent = formatNumber(stats.avgStars);
-}
-
-/**
- * Get repository data
- * @param {Array} members - Array of member objects
- * @returns {Object} - Repository statistics
- */
-async function getRepositoryData(members) {
-  let publicRepos = 0;
-  let privateRepos = 0;
-  let totalStars = 0;
-  let totalForks = 0;
-  let totalPRs = 0;
-  let totalCommits = 0;
-
-  // Use both stored data and calculate from API if needed
-  for (const member of members) {
-    if (member.githubConnected && member.githubUsername) {
-      // Try to get from stored activity first
-      if (member.githubActivity) {
-        publicRepos += member.githubActivity.publicRepos || 0;
-        privateRepos += member.githubActivity.privateRepos || 0;
-        totalStars += member.githubActivity.totalStars || 0;
-        totalForks += member.githubActivity.totalForks || 0;
-        totalPRs += member.githubActivity.pullRequests || 0;
-        totalCommits += member.githubActivity.commits || 0;
-      }
-
-      // Fallback to API data if stored data is incomplete
-      if (
-        (!member.githubActivity || !member.githubActivity.publicRepos) &&
-        member.githubUsername
-      ) {
-        try {
-          const githubInfo = await fetchGitHubUserInfo(
-            member.githubUsername,
-            true
-          );
-          if (githubInfo) {
-            publicRepos += githubInfo.public_repos || 0;
-          }
-        } catch (error) {
-          console.error(
-            `Error fetching repo data for ${member.githubUsername}:`,
-            error
-          );
-        }
-      }
-    }
+    if (totalReposEl) totalReposEl.textContent = formatNumber(stats.totalRepos);
+    if (totalStarsEl) totalStarsEl.textContent = formatNumber(stats.totalStars);
+    if (avgReposEl) avgReposEl.textContent = formatNumber(stats.avgRepos);
+    if (totalPRsEl) totalPRsEl.textContent = formatNumber(stats.totalPRs);
+    if (totalCommitsEl)
+      totalCommitsEl.textContent = formatNumber(stats.totalCommits);
+    if (totalIssuesEl)
+      totalIssuesEl.textContent = formatNumber(stats.totalIssues);
+    if (avgStarsEl) avgStarsEl.textContent = formatNumber(stats.avgStars);
+  } catch (error) {
+    handleError(error, { module: 'analytics', action: 'updateActivityStats' });
   }
-
-  return {
-    public: publicRepos,
-    private: privateRepos,
-    stars: totalStars,
-    forks: totalForks,
-    prs: totalPRs,
-    commits: totalCommits,
-  };
 }
+
+// getRepositoryData is now replaced by calculateRepositoryStats from stats-service.js
 
 /**
  * Get language distribution data
@@ -454,116 +450,11 @@ function getTopContributors(members) {
     .slice(0, 10);
 }
 
-/**
- * Get top committers by commits
- * @param {Array} members - Array of member objects
- * @returns {Array} - Top committers array
- */
-function getTopCommitters(members) {
-  return members
-    .filter(
-      (member) =>
-        member.githubActivity &&
-        member.githubActivity.commits !== undefined &&
-        member.githubActivity.commits !== null
-    )
-    .map((member) => ({
-      name:
-        member.displayName ||
-        `${member.firstName || ""} ${member.lastName || ""}`.trim() ||
-        "Unknown",
-      commits: member.githubActivity.commits || 0,
-      contributions: member.githubActivity.contributions || 0,
-    }))
-    .sort((a, b) => b.commits - a.commits)
-    .slice(0, 10);
-}
+// getTopCommitters is now imported from stats-service.js
 
-/**
- * Get top PR creators
- * @param {Array} members - Array of member objects
- * @returns {Array} - Top PR creators array
- */
-function getTopPRCreators(members) {
-  return members
-    .filter(
-      (member) =>
-        member.githubActivity &&
-        (member.githubActivity.pullRequests ||
-          member.githubActivity.mergedPRs ||
-          member.githubActivity.openPRs)
-    )
-    .map((member) => ({
-      name:
-        member.displayName ||
-        `${member.firstName || ""} ${member.lastName || ""}`.trim() ||
-        "Unknown",
-      prs: member.githubActivity.pullRequests || 0,
-      merged: member.githubActivity.mergedPRs || 0,
-      open: member.githubActivity.openPRs || 0,
-      closed: member.githubActivity.closedPRs || 0,
-    }))
-    .sort((a, b) => b.prs - a.prs)
-    .slice(0, 10);
-}
+// getTopPRCreators is now imported from stats-service.js
 
-/**
- * Get activity statistics
- * @param {Array} members - Array of member objects
- * @returns {Object} - Activity statistics
- */
-function getActivityStats(members) {
-  let totalRepos = 0;
-  let totalStars = 0;
-  let totalPRs = 0;
-  let totalCommits = 0;
-  let totalIssues = 0;
-  let totalForks = 0;
-  let memberCount = 0;
-  let connectedMembers = 0;
-
-  members.forEach((member) => {
-    if (member.githubConnected) {
-      connectedMembers++;
-
-      if (member.githubActivity) {
-        totalRepos +=
-          (member.githubActivity.publicRepos || 0) +
-          (member.githubActivity.privateRepos || 0);
-        totalStars += member.githubActivity.totalStars || 0;
-        totalPRs += member.githubActivity.pullRequests || 0;
-        totalCommits +=
-          member.githubActivity.commits !== undefined &&
-          member.githubActivity.commits !== null
-            ? member.githubActivity.commits
-            : 0;
-        totalIssues += member.githubActivity.issues || 0;
-        totalForks += member.githubActivity.totalForks || 0;
-        memberCount++;
-      } else if (member.githubUsername) {
-        // Count member even if activity data not yet loaded
-        memberCount++;
-      }
-    }
-  });
-
-  const avgRepos = memberCount > 0 ? Math.round(totalRepos / memberCount) : 0;
-  const avgStars = memberCount > 0 ? Math.round(totalStars / memberCount) : 0;
-  const avgPRs = memberCount > 0 ? Math.round(totalPRs / memberCount) : 0;
-
-  return {
-    totalRepos,
-    totalStars,
-    totalPRs,
-    totalCommits,
-    totalIssues,
-    totalForks,
-    avgRepos,
-    avgStars,
-    avgPRs,
-    connectedMembers,
-  };
-}
+// getActivityStats is now replaced by calculateAnalyticsStats from stats-service.js
 
 /**
  * Load PR Activity Chart
@@ -571,18 +462,42 @@ function getActivityStats(members) {
  */
 function loadPRActivityChart(members) {
   const prCtx = document.getElementById("prActivityChart");
-  if (!prCtx) return;
+  if (!prCtx) {
+    console.warn('PR Activity chart container not found');
+    return;
+  }
 
-  const prData = getPRActivityData(members);
+  // Check if Chart.js is available
+  if (typeof Chart === 'undefined') {
+    console.error('Chart.js is not loaded. Please ensure Chart.js is included in the page.');
+    return;
+  }
 
-  new Chart(prCtx, {
+  try {
+    // Destroy existing chart if it exists
+    if (window.prActivityChartInstance) {
+      window.prActivityChartInstance.destroy();
+      window.prActivityChartInstance = null;
+    }
+
+    const prData = getPRActivityData(members);
+
+    // Validate data
+    const chartData = [
+      prData.total || 0,
+      prData.open || 0,
+      prData.merged || 0,
+      prData.closed || 0,
+    ];
+
+    window.prActivityChartInstance = new Chart(prCtx, {
     type: "bar",
     data: {
       labels: ["Total PRs", "Open PRs", "Merged PRs", "Closed PRs"],
       datasets: [
         {
           label: "Pull Requests",
-          data: [prData.total, prData.open, prData.merged, prData.closed],
+          data: chartData,
           backgroundColor: ["#667eea", "#10b981", "#059669", "#ef4444"],
           borderRadius: 8,
         },
@@ -606,6 +521,10 @@ function loadPRActivityChart(members) {
       },
     },
   });
+  } catch (error) {
+    console.error('Error creating PR Activity chart:', error);
+    handleError(error, { module: 'analytics', action: 'loadPRActivityChart' });
+  }
 }
 
 /**

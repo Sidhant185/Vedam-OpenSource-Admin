@@ -1,6 +1,6 @@
 // Forms List Page Module
 import { db, collection, getDocs, doc, deleteDoc, setDoc, updateDoc, query, where, orderBy, Timestamp } from '../firebase-config.js';
-import { showLoading, hideLoading, formatNumber, showToast } from './utils.js';
+import { showLoading, hideLoading, formatNumber, showToast, debounce, handleError } from './utils.js';
 import { getCurrentUser } from './auth.js';
 
 let formsList = [];
@@ -46,12 +46,22 @@ function setupEventListeners() {
     const clearFormSearch = document.getElementById('clearFormSearch');
     
     if (formSearch) {
-        formSearch.addEventListener('input', () => {
+        // Debounce search input to avoid excessive filtering
+        const debouncedFilter = debounce(() => {
             filterForms();
             updateFilterIndicators();
             if (clearFormSearch) {
                 clearFormSearch.style.display = formSearch.value ? 'flex' : 'none';
             }
+        }, 300);
+        
+        formSearch.addEventListener('input', () => {
+            // Show clear button immediately
+            if (clearFormSearch) {
+                clearFormSearch.style.display = formSearch.value ? 'flex' : 'none';
+            }
+            // Debounce the actual filtering
+            debouncedFilter();
         });
     }
 
