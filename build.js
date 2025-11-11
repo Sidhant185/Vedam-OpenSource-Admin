@@ -80,19 +80,53 @@ if (missingVars.length > 0) {
   process.exit(1);
 }
 
+// Helper function to safely escape and wrap environment variable values
+function getEnvValue(key) {
+  const value = process.env[key];
+  if (!value || (typeof value === 'string' && value.trim() === '')) {
+    throw new Error(`Environment variable ${key} is missing or empty`);
+  }
+  // Convert to string and escape special characters
+  const strValue = String(value);
+  // Escape backslashes first, then quotes, then newlines and other control characters
+  const escaped = strValue
+    .replace(/\\/g, '\\\\')  // Escape backslashes
+    .replace(/"/g, '\\"')   // Escape double quotes
+    .replace(/\n/g, '\\n')   // Escape newlines
+    .replace(/\r/g, '\\r')   // Escape carriage returns
+    .replace(/\t/g, '\\t');  // Escape tabs
+  return `"${escaped}"`;
+}
+
+// Helper function for optional env vars (keeps placeholder if not set)
+function getOptionalEnvValue(key, placeholder) {
+  const value = process.env[key];
+  if (!value || (typeof value === 'string' && value.trim() === '')) {
+    return placeholder;
+  }
+  const strValue = String(value);
+  const escaped = strValue
+    .replace(/\\/g, '\\\\')
+    .replace(/"/g, '\\"')
+    .replace(/\n/g, '\\n')
+    .replace(/\r/g, '\\r')
+    .replace(/\t/g, '\\t');
+  return `"${escaped}"`;
+}
+
 // Files to copy and process
 const filesToProcess = [
   {
     source: 'firebase-config.js',
     target: 'firebase-config.js',
     replacements: {
-      '"VITE_FIREBASE_API_KEY"': `"${process.env.VITE_FIREBASE_API_KEY}"`,
-      '"VITE_FIREBASE_AUTH_DOMAIN"': `"${process.env.VITE_FIREBASE_AUTH_DOMAIN}"`,
-      '"VITE_FIREBASE_PROJECT_ID"': `"${process.env.VITE_FIREBASE_PROJECT_ID}"`,
-      '"VITE_FIREBASE_STORAGE_BUCKET"': `"${process.env.VITE_FIREBASE_STORAGE_BUCKET}"`,
-      '"VITE_FIREBASE_MESSAGING_SENDER_ID"': `"${process.env.VITE_FIREBASE_MESSAGING_SENDER_ID}"`,
-      '"VITE_FIREBASE_APP_ID"': `"${process.env.VITE_FIREBASE_APP_ID}"`,
-      '"VITE_FIREBASE_MEASUREMENT_ID"': `"${process.env.VITE_FIREBASE_MEASUREMENT_ID}"`,
+      '"VITE_FIREBASE_API_KEY"': getEnvValue('VITE_FIREBASE_API_KEY'),
+      '"VITE_FIREBASE_AUTH_DOMAIN"': getEnvValue('VITE_FIREBASE_AUTH_DOMAIN'),
+      '"VITE_FIREBASE_PROJECT_ID"': getEnvValue('VITE_FIREBASE_PROJECT_ID'),
+      '"VITE_FIREBASE_STORAGE_BUCKET"': getEnvValue('VITE_FIREBASE_STORAGE_BUCKET'),
+      '"VITE_FIREBASE_MESSAGING_SENDER_ID"': getEnvValue('VITE_FIREBASE_MESSAGING_SENDER_ID'),
+      '"VITE_FIREBASE_APP_ID"': getEnvValue('VITE_FIREBASE_APP_ID'),
+      '"VITE_FIREBASE_MEASUREMENT_ID"': getEnvValue('VITE_FIREBASE_MEASUREMENT_ID'),
     }
   },
   {
@@ -100,7 +134,7 @@ const filesToProcess = [
     target: 'js/github-api.js',
     replacements: {
       "const GITHUB_TOKEN = 'VITE_GITHUB_TOKEN'": process.env.VITE_GITHUB_TOKEN && process.env.VITE_GITHUB_TOKEN.trim() !== '' 
-        ? `const GITHUB_TOKEN = '${process.env.VITE_GITHUB_TOKEN}'` 
+        ? `const GITHUB_TOKEN = '${String(process.env.VITE_GITHUB_TOKEN).replace(/'/g, "\\'")}'` 
         : "const GITHUB_TOKEN = 'VITE_GITHUB_TOKEN'", // Keep placeholder if not set
     }
   },
@@ -109,7 +143,7 @@ const filesToProcess = [
     target: 'js/auth.js',
     replacements: {
       "const ADMIN_EMAIL = 'VITE_ADMIN_EMAIL';": process.env.VITE_ADMIN_EMAIL && process.env.VITE_ADMIN_EMAIL.trim() !== ''
-        ? `const ADMIN_EMAIL = '${process.env.VITE_ADMIN_EMAIL}';`
+        ? `const ADMIN_EMAIL = '${String(process.env.VITE_ADMIN_EMAIL).replace(/'/g, "\\'")}';`
         : "const ADMIN_EMAIL = 'VITE_ADMIN_EMAIL';", // Keep placeholder if not set
     }
   }
@@ -142,6 +176,19 @@ filesToProcess.forEach(({ source, target, replacements }) => {
   });
   
   if (modified) {
+    // Validate JavaScript syntax for .js files - check for common issues
+    if (source.endsWith('.js')) {
+      // Check for obvious syntax errors that could break the file
+      if (content.includes(': :') || content.includes('undefined:') || content.includes('null:')) {
+        throw new Error(`Invalid replacement detected in ${source}. Check environment variables for special characters.`);
+      }
+      // Check for unclosed strings (basic check)
+      const quoteCount = (content.match(/"/g) || []).length;
+      if (quoteCount % 2 !== 0) {
+        throw new Error(`Unclosed string detected in ${source}. Check environment variables.`);
+      }
+    }
+    
     fs.writeFileSync(sourcePath, content);
     console.log(`✅ Updated ${source}`);
   } else {

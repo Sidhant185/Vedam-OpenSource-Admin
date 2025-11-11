@@ -44,8 +44,22 @@
 [build.processing]
   skip_processing = false
 
-# Automatic preview deployments for all branches and PRs
-# No manual approval needed for preview deployments
+# ============================================================================
+# AUTOMATIC PREVIEW DEPLOYMENTS
+# ============================================================================
+# Preview deployments are AUTOMATIC - no manual approval needed
+# When a PR is created, Netlify automatically:
+# 1. Builds the preview
+# 2. Deploys it
+# 3. Creates a preview URL
+# 4. Comments on the PR (via GitHub Actions workflow)
+#
+# IMPORTANT: Ensure these settings are enabled in Netlify Dashboard:
+# - Site Settings → Build & Deploy → Deploy previews
+#   ✅ Enable deploy previews: ON
+#   ✅ Automatic deploy previews: ON (no approval needed)
+# ============================================================================
+
 [context.branch-deploy]
   command = "npm install && npm run build"
   publish = "."
@@ -53,6 +67,7 @@
 [context.deploy-preview]
   command = "npm install && npm run build"
   publish = "."
+  # Automatic deployment - no approval required
 
 # Production deployment only on main branch (after PR merge)
 [context.production]
