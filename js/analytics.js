@@ -33,7 +33,7 @@ export async function loadAnalytics() {
     loadTopPRCreators(members);
     updateActivityStats(members);
     loadPRActivityChart(members);
-    loadLanguageStatistics(members);
+    // Language Statistics removed - only pie chart remains
   } catch (error) {
     handleError(error, { module: 'analytics', action: 'loadAnalytics' });
   } finally {
@@ -211,6 +211,9 @@ async function loadAnalyticsCharts(members) {
         },
       },
     });
+    
+    // Load top 5 languages list below the chart
+    loadTopLanguagesList(languageData);
     } catch (error) {
       console.error('Error creating language chart:', error);
       handleError(error, { module: 'analytics', action: 'loadAnalyticsCharts', chart: 'languageChart' });
@@ -551,65 +554,59 @@ function getPRActivityData(members) {
 }
 
 /**
- * Load Language Statistics
- * @param {Array} members - Array of member objects
+ * Load top 5 languages list below the Language Distribution chart
+ * @param {Object} languageData - Language data object with labels and data arrays
  */
-function loadLanguageStatistics(members) {
-  const languageStatsContainer = document.getElementById("languageStats");
-  if (!languageStatsContainer) return;
-
-  const languageData = getLanguageData(members);
+function loadTopLanguagesList(languageData) {
+  const topLanguagesContainer = document.getElementById("topLanguagesList");
+  if (!topLanguagesContainer) return;
 
   if (
+    !languageData ||
+    !languageData.labels ||
     languageData.labels.length === 0 ||
     languageData.labels[0] === "No Language Data"
   ) {
-    languageStatsContainer.innerHTML =
-      '<p style="text-align: center; color: #64748b; padding: 20px;">No language data available</p>';
+    topLanguagesContainer.innerHTML =
+      '<p style="text-align: center; color: #64748b; padding: 1rem;">No language data available</p>';
     return;
   }
 
   const total = languageData.data.reduce((a, b) => a + b, 0);
-  const isBytes = languageData.isBytes || false;
+  const top5Languages = languageData.labels
+    .slice(0, 5)
+    .map((label, index) => {
+      const count = languageData.data[index];
+      const percentage = total > 0 ? ((count / total) * 100).toFixed(1) : 0;
+      return { label, count, percentage };
+    });
 
-  let html = '<div class="language-stats-list">';
+  const colors = [
+    "#667eea",
+    "#764ba2",
+    "#10b981",
+    "#f59e0b",
+    "#ef4444",
+  ];
 
-  languageData.labels.forEach((lang, index) => {
-    const count = languageData.data[index];
-    const percentage = total > 0 ? ((count / total) * 100).toFixed(1) : 0;
-
-    // Format count display
-    let countDisplay = "";
-    if (isBytes) {
-      // Convert bytes to readable format (KB, MB, GB)
-      if (count >= 1024 * 1024 * 1024) {
-        countDisplay = `${(count / (1024 * 1024 * 1024)).toFixed(2)} GB`;
-      } else if (count >= 1024 * 1024) {
-        countDisplay = `${(count / (1024 * 1024)).toFixed(2)} MB`;
-      } else if (count >= 1024) {
-        countDisplay = `${(count / 1024).toFixed(2)} KB`;
-      } else {
-        countDisplay = `${count} bytes`;
-      }
-    } else {
-      countDisplay = `${formatNumber(count)} repos`;
-    }
-
+  let html = '<div class="top-languages-grid">';
+  top5Languages.forEach((lang, index) => {
     html += `
-            <div class="language-stat-item">
-                <div class="language-stat-header">
-                    <span class="language-name">${lang}</span>
-                    <span class="language-percentage">${percentage}%</span>
-                </div>
-                <div class="language-stat-bar">
-                    <div class="language-stat-bar-fill" style="width: ${percentage}%"></div>
-                </div>
-                <div class="language-stat-count">${countDisplay}</div>
-            </div>
-        `;
+      <div class="top-language-item">
+        <div class="top-language-header">
+          <span class="top-language-dot" style="background-color: ${colors[index]}"></span>
+          <span class="top-language-name">${lang.label}</span>
+          <span class="top-language-percentage">${lang.percentage}%</span>
+        </div>
+        <div class="top-language-bar">
+          <div class="top-language-bar-fill" style="width: ${lang.percentage}%; background-color: ${colors[index]}"></div>
+        </div>
+        <div class="top-language-count">${formatNumber(lang.count)} ${languageData.isBytes ? 'bytes' : 'repos'}</div>
+      </div>
+    `;
   });
-
   html += "</div>";
-  languageStatsContainer.innerHTML = html;
+
+  topLanguagesContainer.innerHTML = html;
 }
 

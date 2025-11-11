@@ -748,19 +748,144 @@ export async function fetchContributionCalendar(login) {
 /**
  * Fetch user pull requests
  * @param {string} githubUsername - GitHub username
- * @param {string} state - PR state: 'all', 'open', 'closed', 'merged'
+ * @param {string} state - PR state: 'all', 'open', 'closed'
  * @param {number} limit - Maximum PRs to fetch
  * @returns {Promise<Array>} - Array of PR objects
  */
-export async function fetchUserPullRequests(githubUsername, state = 'all', limit = 30) {
+export async function fetchUserPullRequests(githubUsername, state = 'all', limit = 50) {
     try {
         // Return empty array if no token or token is placeholder
-        if (!GITHUB_TOKEN || GITHUB_TOKEN === 'VITE_GITHUB_TOKEN') {
+        if (!GITHUB_TOKEN || GITHUB_TOKEN === 'VITE_GITHUB_TOKEN' || GITHUB_TOKEN.trim() === '') {
+            console.warn('GitHub token not available, cannot fetch pull requests');
             return [];
         }
+
+        console.log(`Fetching pull requests for ${githubUsername} (state: ${state}, limit: ${limit})`);
+        const prs = [];
+        let page = 1;
+        const perPage = Math.min(limit, 100); // GitHub API max is 100 per page
         
-        // This would require GraphQL API - simplified version
-        return [];
+        while (prs.length < limit) {
+            // Build query based on state - GitHub Search API uses spaces, not +
+            let query = `author:${githubUsername} type:pr`;
+            if (state === 'open') {
+                query += ' state:open';
+            } else if (state === 'closed') {
+                query += ' state:closed';
+            }
+            
+            const url = `https://api.github.com/search/issues?q=${encodeURIComponent(query)}&sort=updated&order=desc&per_page=${perPage}&page=${page}`;
+            
+            console.log(`Fetching PRs page ${page}...`);
+            console.log(`Query: ${query}`);
+            console.log(`URL: ${url}`);
+            const response = await githubApiRequest(url);
+            
+            if (!response.ok) {
+                if (response.status === 422) {
+                    // 422 can mean no PRs found OR invalid query
+                    // Try to get error details
+                    try {
+                        const errorData = await response.json();
+                        console.warn('422 Error details:', errorData);
+                        if (errorData.message && errorData.message.includes('validation failed')) {
+                            console.log('Query validation failed - user may not exist or have no PRs');
+                        }
+                    } catch (e) {
+                        console.log('No PRs found or invalid query (422 response)');
+                    }
+                    break;
+                }
+                console.warn(`Error fetching PRs: ${response.status} - ${response.statusText}`);
+                const errorText = await response.text().catch(() => '');
+                console.warn('Error details:', errorText);
+                break;
+            }
+            
+            const data = await response.json();
+            const items = data.items || [];
+            
+            console.log(`Received ${items.length} PRs from API`);
+            
+            if (items.length === 0) {
+                break;
+            }
+            
+            // Process PRs - simplified merged check (check only first few for performance)
+            for (const item of items) {
+                if (prs.length >= limit) break;
+                
+                // Extract repository name from repository_url or use repository field
+                let repository_full_name = '';
+                if (item.repository_url) {
+                    const match = item.repository_url.match(/repos\/([^\/]+\/[^\/]+)/);
+                    if (match) {
+                        repository_full_name = match[1];
+                    }
+                }
+                // Alternative: try repository field if available
+                if (!repository_full_name && item.repository) {
+                    if (typeof item.repository === 'string') {
+                        repository_full_name = item.repository;
+                    } else if (item.repository.full_name) {
+                        repository_full_name = item.repository.full_name;
+                    }
+                }
+                
+                // For performance, only check merged status for first 20 PRs
+                // For others, estimate based on state (closed PRs might be merged)
+                let isMerged = false;
+                if (prs.length < 20 && item.pull_request && item.pull_request.url) {
+                    try {
+                        const prDetailResponse = await githubApiRequest(item.pull_request.url);
+                        if (prDetailResponse.ok) {
+                            const prDetail = await prDetailResponse.json();
+                            isMerged = !!prDetail.merged_at;
+                        }
+                        // Small delay to avoid rate limiting
+                        await new Promise(r => setTimeout(r, 50));
+                    } catch (err) {
+                        // If we can't check, estimate: if state is closed, might be merged
+                        isMerged = item.state === 'closed';
+                        console.warn('Could not check merged status for PR:', item.html_url);
+                    }
+                } else {
+                    // For PRs beyond first 20, estimate merged status
+                    // Closed PRs might be merged, but we'll mark as not merged to be safe
+                    isMerged = false;
+                }
+                
+                prs.push({
+                    title: item.title || 'Untitled PR',
+                    url: item.html_url,
+                    html_url: item.html_url,
+                    state: item.state,
+                    created_at: item.created_at,
+                    updated_at: item.updated_at,
+                    createdAt: item.created_at,
+                    updatedAt: item.updated_at,
+                    repository_full_name: repository_full_name,
+                    repository: repository_full_name,
+                    merged: isMerged,
+                    id: item.id
+                });
+            }
+            
+            console.log(`Total PRs collected so far: ${prs.length}`);
+            
+            // Check if there are more pages
+            if (items.length < perPage || prs.length >= limit) {
+                break;
+            }
+            
+            page++;
+            
+            // Small delay between pages
+            await new Promise(r => setTimeout(r, 100));
+        }
+        
+        console.log(`Successfully fetched ${prs.length} pull requests for ${githubUsername}`);
+        return prs;
     } catch (error) {
         console.error('Error fetching pull requests:', error);
         return [];

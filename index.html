@@ -382,31 +382,28 @@
           </div>
 
           <div class="analytics-grid">
-            <div class="analytics-card">
+            <div class="analytics-card card-large">
+              <h3>Pull Request Activity</h3>
+              <div style="height: 300px; position: relative">
+                <canvas id="prActivityChart"></canvas>
+              </div>
+            </div>
+            <div class="analytics-card card-large">
               <h3>Repository Statistics</h3>
               <div style="height: 300px; position: relative">
                 <canvas id="repoChart"></canvas>
               </div>
             </div>
-            <div class="analytics-card">
+            <div class="analytics-card card-large">
               <h3>Language Distribution</h3>
               <div style="height: 300px; position: relative">
                 <canvas id="languageChart"></canvas>
               </div>
-            </div>
-            <div class="analytics-card">
-              <h3>Top Committers</h3>
-              <div id="topCommitters" class="contributors-list">
-                <!-- Top committers will be loaded here -->
+              <div id="topLanguagesList" class="top-languages-list" style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 2px solid #f1f5f9;">
+                <!-- Top 5 languages will be loaded here -->
               </div>
             </div>
-            <div class="analytics-card">
-              <h3>Top PR Creators</h3>
-              <div id="topPRCreators" class="contributors-list">
-                <!-- Top PR creators will be loaded here -->
-              </div>
-            </div>
-            <div class="analytics-card">
+            <div class="analytics-card card-large">
               <h3>Activity Summary</h3>
               <div class="activity-stats">
                 <div class="activity-item">
@@ -439,16 +436,16 @@
                 </div>
               </div>
             </div>
-            <div class="analytics-card">
-              <h3>Language Statistics</h3>
-              <div id="languageStats" class="language-stats-container">
-                <!-- Language stats will be loaded here -->
+            <div class="analytics-card card-large">
+              <h3>Top Committers</h3>
+              <div id="topCommitters" class="contributors-list">
+                <!-- Top committers will be loaded here -->
               </div>
             </div>
-            <div class="analytics-card">
-              <h3>Pull Request Activity</h3>
-              <div style="height: 300px; position: relative">
-                <canvas id="prActivityChart"></canvas>
+            <div class="analytics-card card-large">
+              <h3>Top PR Creators</h3>
+              <div id="topPRCreators" class="contributors-list">
+                <!-- Top PR creators will be loaded here -->
               </div>
             </div>
           </div>

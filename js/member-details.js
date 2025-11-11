@@ -67,13 +67,47 @@ async function loadMemberDetails(member) {
         
         // Fetch repositories, PRs, and commits in parallel
         if (githubInfo) {
+            try {
             [repositories, pullRequests, recentCommits] = await Promise.all([
                 fetchUserRepositories(member.githubUsername, 50),
-                fetchUserPullRequests(member.githubUsername, 'all', 50),
+                    fetchUserPullRequests(member.githubUsername, 'all', 50).catch(err => {
+                        console.error('Error fetching PRs:', err);
+                        // Fallback to cached PRs if available
+                        const cachedPRs = member.githubActivity?.recentPRs || [];
+                        return cachedPRs.map(pr => ({
+                            title: pr.title,
+                            url: pr.url,
+                            html_url: pr.url,
+                            state: pr.state,
+                            created_at: pr.createdAt,
+                            updated_at: pr.createdAt,
+                            createdAt: pr.createdAt,
+                            updatedAt: pr.createdAt,
+                            repository_full_name: '',
+                            repository: '',
+                            merged: pr.merged || false
+                        }));
+                    }),
                 fetchRecentCommits(member.githubUsername, 30).catch(() => [])
             ]);
+                
+                console.log(`Fetched ${pullRequests.length} pull requests for ${member.githubUsername}`);
+                if (pullRequests.length > 0) {
+                    console.log('Sample PR:', pullRequests[0]);
+                }
+            } catch (error) {
+                console.error('Error fetching GitHub data:', error);
+                // Use empty arrays if fetch fails
+                repositories = [];
+                pullRequests = [];
+                recentCommits = [];
+            }
         }
     }
+    
+    // Debug: Log PR data
+    console.log('PRs to display:', pullRequests.length);
+    console.log('PRs data:', pullRequests);
     
     const githubUsername = githubInfo ? githubInfo.username : 'N/A';
     const githubProfileUrl = githubInfo ? githubInfo.html_url : '#';
@@ -139,7 +173,7 @@ async function loadMemberDetails(member) {
 
             <div class="member-details-grid">
                 <!-- Basic Information Card -->
-                <div class="detail-card">
+                <div class="detail-card card-large">
                     <div class="detail-card-header">
                         <i class="fas fa-user"></i>
                         <h3>Basic Information</h3>
@@ -165,7 +199,7 @@ async function loadMemberDetails(member) {
                 </div>
 
                 <!-- GitHub Information Card -->
-                <div class="detail-card">
+                <div class="detail-card card-large">
                     <div class="detail-card-header">
                         <i class="fab fa-github"></i>
                         <h3>GitHub Profile</h3>
@@ -212,7 +246,7 @@ async function loadMemberDetails(member) {
                 </div>
 
                 <!-- GitHub Statistics Card -->
-                <div class="detail-card">
+                <div class="detail-card card-large">
                     <div class="detail-card-header">
                         <i class="fas fa-chart-line"></i>
                         <h3>GitHub Statistics</h3>
@@ -284,69 +318,212 @@ async function loadMemberDetails(member) {
                     </div>
                 </div>
 
+                <!-- Activity Timeline Card -->
+                <div class="detail-card card-large">
+                    <div class="detail-card-header">
+                        <i class="fas fa-clock"></i>
+                        <h3>Activity Timeline</h3>
+                    </div>
+                    <div class="detail-card-body">
+                        <div class="detail-row">
+                            <span class="detail-label">Joined Date</span>
+                            <span class="detail-value">${joinedDate}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">Last Updated</span>
+                            <span class="detail-value">${lastUpdated}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">Member Status</span>
+                            <span class="detail-value">
+                                <span class="status-badge ${member.githubConnected ? 'status-active' : 'status-inactive'}">
+                                    ${member.githubConnected ? 'Active' : 'Inactive'}
+                                </span>
+                            </span>
+                        </div>
+                        ${blog && blog !== 'N/A' ? `
+                            <div class="detail-row">
+                                <span class="detail-label">Website/Blog</span>
+                                <span class="detail-value">
+                                    <a href="${blog}" target="_blank" class="github-link">${blog}</a>
+                                </span>
+                            </div>
+                        ` : ''}
+                    </div>
+                </div>
+
                 <!-- Pull Request Details Card -->
-                ${member.githubConnected && pullRequests.length > 0 ? `
-                <div class="detail-card">
+                ${member.githubConnected ? `
+                <div class="detail-card card-large">
                     <div class="detail-card-header">
                         <i class="fas fa-code-pull-request"></i>
-                        <h3>Pull Request Details</h3>
+                        <h3>Pull Requests</h3>
                         <span class="detail-card-badge">${pullRequests.length} PRs</span>
                     </div>
                     <div class="detail-card-body">
-                        <div class="pr-stats-grid">
-                            <div class="pr-stat-item">
-                                <div class="pr-stat-value">${formatNumber(pullRequests.length)}</div>
-                                <div class="pr-stat-label">Total PRs</div>
-                            </div>
-                            <div class="pr-stat-item open">
-                                <div class="pr-stat-value">${formatNumber(fetchedOpenPRs)}</div>
-                                <div class="pr-stat-label">Open</div>
-                            </div>
-                            <div class="pr-stat-item merged">
-                                <div class="pr-stat-value">${formatNumber(fetchedMergedPRs)}</div>
-                                <div class="pr-stat-label">Merged</div>
-                            </div>
-                            <div class="pr-stat-item closed">
-                                <div class="pr-stat-value">${formatNumber(fetchedClosedPRs)}</div>
-                                <div class="pr-stat-label">Closed</div>
-                            </div>
-                        </div>
+                        ${pullRequests.length > 0 ? `
                         <div class="pr-list-container">
-                            <h4 style="margin: 1rem 0 0.5rem 0; color: #1e293b;">Recent Pull Requests</h4>
-                            <div class="pr-list">
-                                ${pullRequests.slice(0, 10).map(pr => {
-                                    const isMerged = pr.merged || pr.state === 'merged';
-                                    const displayState = isMerged ? 'merged' : (pr.state === 'open' ? 'open' : 'closed');
-                                    const displayLabel = isMerged ? 'Merged' : (pr.state === 'open' ? 'Open' : 'Closed');
-                                    return `
-                                    <div class="pr-item ${displayState}">
-                                        <div class="pr-header">
-                                            <a href="${pr.url}" target="_blank" class="pr-title-link">
-                                                <i class="fas fa-code-pull-request"></i> ${pr.title || 'Untitled PR'}
-                                            </a>
-                                            <span class="pr-status-badge ${displayState}">
-                                                ${displayLabel}
-                                            </span>
-                                        </div>
-                                        ${pr.repository_full_name ? `
-                                            <div class="pr-repo">
-                                                <i class="fas fa-folder"></i> ${pr.repository_full_name}
-                                            </div>
-                                        ` : ''}
-                                        <div class="pr-meta">
-                                            <span><i class="fas fa-calendar"></i> ${formatDate(pr.created_at)}</span>
-                                            ${pr.updated_at !== pr.created_at ? `
-                                                <span><i class="fas fa-sync"></i> Updated ${formatDate(pr.updated_at)}</span>
-                                            ` : ''}
+                            <div class="tab-container">
+                                <div class="tab-header">
+                                    <button class="tab-button active" onclick="switchPRTab('all')">All PRs (${pullRequests.length})</button>
+                                    <button class="tab-button" onclick="switchPRTab('open')">Open (${fetchedOpenPRs})</button>
+                                    <button class="tab-button" onclick="switchPRTab('merged')">Merged (${fetchedMergedPRs})</button>
+                                    <button class="tab-button" onclick="switchPRTab('closed')">Closed (${fetchedClosedPRs})</button>
+                                </div>
+                                <div class="tab-content">
+                                    <div class="tab-pane active" id="pr-tab-all">
+                                        <div class="pr-list" style="max-height: 100%;">
+                                            ${pullRequests.length > 0 ? pullRequests.map(pr => {
+                                                const isMerged = pr.merged || pr.state === 'merged';
+                                                const displayState = isMerged ? 'merged' : (pr.state === 'open' ? 'open' : 'closed');
+                                                const displayLabel = isMerged ? 'Merged' : (pr.state === 'open' ? 'Open' : 'Closed');
+                                                return `
+                                                <div class="pr-item ${displayState}">
+                                                    <div class="pr-header">
+                                                        <a href="${pr.url || pr.html_url}" target="_blank" class="pr-title-link">
+                                                            <i class="fas fa-code-pull-request"></i> ${pr.title || 'Untitled PR'}
+                                                        </a>
+                                                        <span class="pr-status-badge ${displayState}">
+                                                            ${displayLabel}
+                                                        </span>
+                                                    </div>
+                                                    ${pr.repository_full_name || pr.repository ? `
+                                                        <div class="pr-repo">
+                                                            <i class="fas fa-folder"></i> ${pr.repository_full_name || pr.repository.full_name || pr.repository}
+                                                        </div>
+                                                    ` : ''}
+                                                    <div class="pr-meta">
+                                                        <span><i class="fas fa-calendar"></i> ${formatDate(pr.created_at || pr.createdAt)}</span>
+                                                        ${(pr.updated_at || pr.updatedAt) && (pr.updated_at !== pr.created_at || pr.updatedAt !== pr.createdAt) ? `
+                                                            <span><i class="fas fa-sync"></i> Updated ${formatDate(pr.updated_at || pr.updatedAt)}</span>
+                                                        ` : ''}
+                                                    </div>
+                                                </div>
+                                            `;
+                                            }).join('') : '<p style="text-align: center; color: #64748b; padding: 2rem;">No pull requests found.</p>'}
                                         </div>
                                     </div>
-                                `;
-                                }).join('')}
+                                    <div class="tab-pane" id="pr-tab-open">
+                                        <div class="pr-list" style="max-height: 100%;">
+                                            ${pullRequests.filter(pr => pr.state === 'open' && !pr.merged).length > 0 ? pullRequests.filter(pr => pr.state === 'open' && !pr.merged).map(pr => {
+                                                return `
+                                                <div class="pr-item open">
+                                                    <div class="pr-header">
+                                                        <a href="${pr.url || pr.html_url}" target="_blank" class="pr-title-link">
+                                                            <i class="fas fa-code-pull-request"></i> ${pr.title || 'Untitled PR'}
+                                                        </a>
+                                                        <span class="pr-status-badge open">Open</span>
+                                                    </div>
+                                                    ${pr.repository_full_name || pr.repository ? `
+                                                        <div class="pr-repo">
+                                                            <i class="fas fa-folder"></i> ${pr.repository_full_name || pr.repository.full_name || pr.repository}
+                                                        </div>
+                                                    ` : ''}
+                                                    <div class="pr-meta">
+                                                        <span><i class="fas fa-calendar"></i> ${formatDate(pr.created_at || pr.createdAt)}</span>
+                                                    </div>
+                                                </div>
+                                            `;
+                                            }).join('') : '<p style="text-align: center; color: #64748b; padding: 2rem;">No open pull requests.</p>'}
+                                        </div>
+                                    </div>
+                                    <div class="tab-pane" id="pr-tab-merged">
+                                        <div class="pr-list" style="max-height: 100%;">
+                                            ${pullRequests.filter(pr => pr.merged || pr.state === 'merged').length > 0 ? pullRequests.filter(pr => pr.merged || pr.state === 'merged').map(pr => {
+                                                return `
+                                                <div class="pr-item merged">
+                                                    <div class="pr-header">
+                                                        <a href="${pr.url || pr.html_url}" target="_blank" class="pr-title-link">
+                                                            <i class="fas fa-code-pull-request"></i> ${pr.title || 'Untitled PR'}
+                                                        </a>
+                                                        <span class="pr-status-badge merged">Merged</span>
+                                                    </div>
+                                                    ${pr.repository_full_name || pr.repository ? `
+                                                        <div class="pr-repo">
+                                                            <i class="fas fa-folder"></i> ${pr.repository_full_name || pr.repository.full_name || pr.repository}
+                                                        </div>
+                                                    ` : ''}
+                                                    <div class="pr-meta">
+                                                        <span><i class="fas fa-calendar"></i> ${formatDate(pr.created_at || pr.createdAt)}</span>
+                                                    </div>
+                                                </div>
+                                            `;
+                                            }).join('') : '<p style="text-align: center; color: #64748b; padding: 2rem;">No merged pull requests.</p>'}
+                                        </div>
+                                    </div>
+                                    <div class="tab-pane" id="pr-tab-closed">
+                                        <div class="pr-list" style="max-height: 100%;">
+                                            ${pullRequests.filter(pr => pr.state === 'closed' && !pr.merged).length > 0 ? pullRequests.filter(pr => pr.state === 'closed' && !pr.merged).map(pr => {
+                                                return `
+                                                <div class="pr-item closed">
+                                                    <div class="pr-header">
+                                                        <a href="${pr.url || pr.html_url}" target="_blank" class="pr-title-link">
+                                                            <i class="fas fa-code-pull-request"></i> ${pr.title || 'Untitled PR'}
+                                                        </a>
+                                                        <span class="pr-status-badge closed">Closed</span>
+                                                    </div>
+                                                    ${pr.repository_full_name || pr.repository ? `
+                                                        <div class="pr-repo">
+                                                            <i class="fas fa-folder"></i> ${pr.repository_full_name || pr.repository.full_name || pr.repository}
+                                                        </div>
+                                                    ` : ''}
+                                                    <div class="pr-meta">
+                                                        <span><i class="fas fa-calendar"></i> ${formatDate(pr.created_at || pr.createdAt)}</span>
+                                                    </div>
+                                                </div>
+                                            `;
+                                            }).join('') : '<p style="text-align: center; color: #64748b; padding: 2rem;">No closed pull requests.</p>'}
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
-                            ${pullRequests.length > 10 ? `
+                        </div>
+                        ` : `
+                        <div class="empty-state">
+                            <i class="fas fa-code-pull-request"></i>
+                            <p>No pull requests found</p>
+                            <a href="${githubProfileUrl}?tab=pullrequests" target="_blank" class="btn btn-secondary" style="margin-top: 1rem;">
+                                <i class="fas fa-external-link-alt"></i> View PRs on GitHub
+                            </a>
+                        </div>
+                        `}
+                    </div>
+                </div>
+                ` : ''}
+
+                <!-- Recent Commits Card -->
+                ${member.githubConnected && recentCommits.length > 0 ? `
+                <div class="detail-card card-large">
+                    <div class="detail-card-header">
+                        <i class="fas fa-code-commit"></i>
+                        <h3>Recent Commits</h3>
+                        <span class="detail-card-badge">${recentCommits.length} commits</span>
+                    </div>
+                    <div class="detail-card-body">
+                        <div class="commits-list-container">
+                            <div class="commits-list">
+                                ${recentCommits.slice(0, 20).map(commit => `
+                                    <div class="commit-item">
+                                        <div class="commit-header">
+                                            <a href="${commit.url}" target="_blank" class="commit-message-link">
+                                                <i class="fas fa-code-commit"></i> ${commit.message || 'No message'}
+                                            </a>
+                                        </div>
+                                        <div class="commit-meta">
+                                            <a href="${commit.repositoryUrl}" target="_blank" class="commit-repo-link">
+                                                <i class="fas fa-folder"></i> ${commit.repository}
+                                            </a>
+                                            <span class="commit-date">
+                                                <i class="fas fa-calendar"></i> ${formatDate(commit.date)}
+                                            </span>
+                                        </div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                            ${recentCommits.length > 20 ? `
                                 <div style="text-align: center; margin-top: 1rem;">
-                                    <a href="${githubProfileUrl}?tab=pullrequests" target="_blank" class="btn btn-secondary">
-                                        <i class="fas fa-external-link-alt"></i> View All ${pullRequests.length} PRs on GitHub
+                                    <a href="${githubProfileUrl}" target="_blank" class="btn btn-secondary">
+                                        <i class="fas fa-external-link-alt"></i> View All Commits on GitHub
                                     </a>
                                 </div>
                             ` : ''}
@@ -357,7 +534,7 @@ async function loadMemberDetails(member) {
 
                 <!-- Repository Details Card -->
                 ${member.githubConnected && repositories.length > 0 ? `
-                <div class="detail-card">
+                <div class="detail-card card-large">
                     <div class="detail-card-header">
                         <i class="fas fa-code-branch"></i>
                         <h3>Repositories</h3>
@@ -437,83 +614,6 @@ async function loadMemberDetails(member) {
                     </div>
                 </div>
                 ` : ''}
-
-                <!-- Recent Commits Card -->
-                ${member.githubConnected && recentCommits.length > 0 ? `
-                <div class="detail-card">
-                    <div class="detail-card-header">
-                        <i class="fas fa-code-commit"></i>
-                        <h3>Recent Commits</h3>
-                        <span class="detail-card-badge">${recentCommits.length} commits</span>
-                    </div>
-                    <div class="detail-card-body">
-                        <div class="commits-list-container">
-                            <div class="commits-list">
-                                ${recentCommits.slice(0, 20).map(commit => `
-                                    <div class="commit-item">
-                                        <div class="commit-header">
-                                            <a href="${commit.url}" target="_blank" class="commit-message-link">
-                                                <i class="fas fa-code-commit"></i> ${commit.message || 'No message'}
-                                            </a>
-                                        </div>
-                                        <div class="commit-meta">
-                                            <a href="${commit.repositoryUrl}" target="_blank" class="commit-repo-link">
-                                                <i class="fas fa-folder"></i> ${commit.repository}
-                                            </a>
-                                            <span class="commit-date">
-                                                <i class="fas fa-calendar"></i> ${formatDate(commit.date)}
-                                            </span>
-                                        </div>
-                                    </div>
-                                `).join('')}
-                            </div>
-                            ${recentCommits.length > 20 ? `
-                                <div style="text-align: center; margin-top: 1rem;">
-                                    <a href="${githubProfileUrl}" target="_blank" class="btn btn-secondary">
-                                        <i class="fas fa-external-link-alt"></i> View All Commits on GitHub
-                                    </a>
-                                </div>
-                            ` : ''}
-                        </div>
-                    </div>
-                </div>
-                ` : ''}
-
-                <!-- Activity Information Card -->
-                <div class="detail-card">
-                    <div class="detail-card-header">
-                        <i class="fas fa-clock"></i>
-                        <h3>Activity Timeline</h3>
-                    </div>
-                    <div class="detail-card-body">
-                        <div class="detail-row">
-                            <span class="detail-label">Joined Date</span>
-                            <span class="detail-value">${joinedDate}</span>
-                        </div>
-                        <div class="detail-row">
-                            <span class="detail-label">Last Updated</span>
-                            <span class="detail-value">${lastUpdated}</span>
-                        </div>
-                        <div class="detail-row">
-                            <span class="detail-label">Member Status</span>
-                            <span class="detail-value">
-                                <span class="status-badge ${member.githubConnected ? 'status-active' : 'status-inactive'}">
-                                    ${member.githubConnected ? 'Active' : 'Inactive'}
-                                </span>
-                            </span>
-                        </div>
-                        ${blog && blog !== 'N/A' ? `
-                            <div class="detail-row">
-                                <span class="detail-label">Website/Blog</span>
-                                <span class="detail-value">
-                                    <a href="${blog.startsWith('http') ? blog : 'https://' + blog}" target="_blank" class="github-link">
-                                        <i class="fas fa-link"></i> ${blog}
-                                    </a>
-                                </span>
-                            </div>
-                        ` : ''}
-                    </div>
-                </div>
             </div>
         </div>
     `;
@@ -522,6 +622,34 @@ async function loadMemberDetails(member) {
 /**
  * Go back to members page
  */
+/**
+ * Switch PR tab
+ * @param {string} tabName - Tab name (all, open, merged, closed)
+ */
+window.switchPRTab = function(tabName) {
+    // Remove active class from all tab buttons and panes
+    const container = document.querySelector('.tab-container');
+    if (!container) return;
+    
+    container.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+    container.querySelectorAll('.tab-pane').forEach(pane => pane.classList.remove('active'));
+    
+    // Add active class to selected tab button
+    const buttons = container.querySelectorAll('.tab-button');
+    buttons.forEach((btn) => {
+        const btnText = btn.textContent.toLowerCase();
+        if (btnText.includes(tabName) || (tabName === 'all' && btnText.includes('all'))) {
+            btn.classList.add('active');
+        }
+    });
+    
+    // Show corresponding tab pane
+    const targetPane = container.querySelector(`#pr-tab-${tabName}`);
+    if (targetPane) {
+        targetPane.classList.add('active');
+    }
+};
+
 window.goBackToMembers = function() {
     document.querySelectorAll('.page').forEach(page => {
         page.classList.remove('active');

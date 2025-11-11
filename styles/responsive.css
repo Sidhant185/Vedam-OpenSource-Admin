@@ -36,6 +36,10 @@
     .stats-grid {
         grid-template-columns: repeat(2, 1fr);
     }
+    
+    /* Member Details Grid tablet - already handled in main CSS */
+    
+    /* Analytics Grid tablet - already handled in main CSS */
 }
 
 /* Desktop and up (1024px) */
@@ -56,6 +60,10 @@
         flex-direction: row;
         gap: 1rem;
     }
+    
+    /* Member Details Grid desktop - already handled in main CSS */
+    
+    /* Analytics Grid desktop - already handled in main CSS */
 }
 
 /* Large Desktop (1440px) */
@@ -64,6 +72,16 @@
         max-width: 1400px;
         margin: 0 auto;
     }
+    
+    /* When sidebar is hidden, utilize full width */
+    .dashboard:not(.sidebar-open) .dashboard-content {
+        max-width: 100%;
+        padding: 2rem 3rem;
+    }
+    
+    /* Member Details Grid large desktop - already handled in main CSS */
+    
+    /* Analytics Grid large desktop - already handled in main CSS */
 }
 
 /* Mobile specific styles (max-width: 767px) */
@@ -162,6 +180,28 @@
     /* Charts mobile */
     .chart-container {
         height: 250px;
+    }
+    
+    /* Member Details Grid mobile */
+    /* Grid now uses auto-fit minmax pattern - no manual override needed */
+    
+    .detail-card {
+        padding: 0;
+    }
+    
+    .detail-card-body {
+        padding: 1.5rem;
+    }
+    
+    .detail-card-header {
+        padding: 1.25rem;
+    }
+    
+    /* Analytics Grid mobile */
+    /* Grid now uses auto-fit minmax pattern - no manual override needed */
+    
+    .analytics-card {
+        padding: 1.5rem;
     }
     
     /* Buttons mobile */
