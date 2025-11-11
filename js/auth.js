@@ -47,6 +47,11 @@ export function initializeAuth(onAuthenticated, onUnauthenticated) {
  * @returns {Promise<boolean>} - True if admin
  */
 async function checkAdminStatus(user) {
+    // Check if ADMIN_EMAIL is still a placeholder
+    if (ADMIN_EMAIL === 'VITE_ADMIN_EMAIL' || !ADMIN_EMAIL || ADMIN_EMAIL.trim() === '') {
+        console.error('ADMIN_EMAIL not configured. Authentication will fail.');
+        return false;
+    }
     return user.email === ADMIN_EMAIL;
 }
 
@@ -58,6 +63,12 @@ async function checkAdminStatus(user) {
  */
 export async function adminLogin(email, password) {
     try {
+        // Check if ADMIN_EMAIL is still a placeholder (not replaced during build)
+        if (ADMIN_EMAIL === 'VITE_ADMIN_EMAIL' || !ADMIN_EMAIL || ADMIN_EMAIL.trim() === '') {
+            console.error('ADMIN_EMAIL not configured. Please set VITE_ADMIN_EMAIL environment variable.');
+            throw new Error('Admin email not configured. Please contact the administrator.');
+        }
+        
         const userCredential = await signInWithEmailAndPassword(auth, email, password);
         const user = userCredential.user;
         
@@ -71,6 +82,18 @@ export async function adminLogin(email, password) {
         return user;
     } catch (error) {
         console.error('Login error:', error);
+        // Provide more helpful error messages
+        if (error.code === 'auth/invalid-email') {
+            throw new Error('Invalid email address.');
+        } else if (error.code === 'auth/user-disabled') {
+            throw new Error('This account has been disabled.');
+        } else if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
+            throw new Error('Invalid email or password.');
+        } else if (error.code === 'auth/too-many-requests') {
+            throw new Error('Too many failed login attempts. Please try again later.');
+        } else if (error.code === 'auth/network-request-failed') {
+            throw new Error('Network error. Please check your internet connection.');
+        }
         throw error;
     }
 }
