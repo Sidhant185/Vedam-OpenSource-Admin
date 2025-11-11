@@ -14,17 +14,35 @@ require('dotenv').config();
 const PORT = process.env.PORT || 8001; // Default to 8001 to avoid conflict with common Python servers
 const ROOT_DIR = path.join(__dirname, '..');
 
+// Helper function to safely escape and wrap environment variable values
+function getEnvValue(key, defaultValue) {
+  const value = process.env[key];
+  if (!value || (typeof value === 'string' && value.trim() === '')) {
+    return `"${defaultValue}"`;
+  }
+  // Convert to string and escape special characters
+  const strValue = String(value);
+  // Escape backslashes first, then quotes, then newlines and other control characters
+  const escaped = strValue
+    .replace(/\\/g, '\\\\')  // Escape backslashes
+    .replace(/"/g, '\\"')   // Escape double quotes
+    .replace(/\n/g, '\\n')   // Escape newlines
+    .replace(/\r/g, '\\r')   // Escape carriage returns
+    .replace(/\t/g, '\\t');  // Escape tabs
+  return `"${escaped}"`;
+}
+
 // Files that need environment variable replacement
 const FILES_TO_PROCESS = {
   'firebase-config.js': {
     replacements: {
-      '"VITE_FIREBASE_API_KEY"': `"${process.env.VITE_FIREBASE_API_KEY || 'VITE_FIREBASE_API_KEY'}"`,
-      '"VITE_FIREBASE_AUTH_DOMAIN"': `"${process.env.VITE_FIREBASE_AUTH_DOMAIN || 'VITE_FIREBASE_AUTH_DOMAIN'}"`,
-      '"VITE_FIREBASE_PROJECT_ID"': `"${process.env.VITE_FIREBASE_PROJECT_ID || 'VITE_FIREBASE_PROJECT_ID'}"`,
-      '"VITE_FIREBASE_STORAGE_BUCKET"': `"${process.env.VITE_FIREBASE_STORAGE_BUCKET || 'VITE_FIREBASE_STORAGE_BUCKET'}"`,
-      '"VITE_FIREBASE_MESSAGING_SENDER_ID"': `"${process.env.VITE_FIREBASE_MESSAGING_SENDER_ID || 'VITE_FIREBASE_MESSAGING_SENDER_ID'}"`,
-      '"VITE_FIREBASE_APP_ID"': `"${process.env.VITE_FIREBASE_APP_ID || 'VITE_FIREBASE_APP_ID'}"`,
-      '"VITE_FIREBASE_MEASUREMENT_ID"': `"${process.env.VITE_FIREBASE_MEASUREMENT_ID || 'VITE_FIREBASE_MEASUREMENT_ID'}"`,
+      '"VITE_FIREBASE_API_KEY"': getEnvValue('VITE_FIREBASE_API_KEY', 'VITE_FIREBASE_API_KEY'),
+      '"VITE_FIREBASE_AUTH_DOMAIN"': getEnvValue('VITE_FIREBASE_AUTH_DOMAIN', 'VITE_FIREBASE_AUTH_DOMAIN'),
+      '"VITE_FIREBASE_PROJECT_ID"': getEnvValue('VITE_FIREBASE_PROJECT_ID', 'VITE_FIREBASE_PROJECT_ID'),
+      '"VITE_FIREBASE_STORAGE_BUCKET"': getEnvValue('VITE_FIREBASE_STORAGE_BUCKET', 'VITE_FIREBASE_STORAGE_BUCKET'),
+      '"VITE_FIREBASE_MESSAGING_SENDER_ID"': getEnvValue('VITE_FIREBASE_MESSAGING_SENDER_ID', 'VITE_FIREBASE_MESSAGING_SENDER_ID'),
+      '"VITE_FIREBASE_APP_ID"': getEnvValue('VITE_FIREBASE_APP_ID', 'VITE_FIREBASE_APP_ID'),
+      '"VITE_FIREBASE_MEASUREMENT_ID"': getEnvValue('VITE_FIREBASE_MEASUREMENT_ID', 'VITE_FIREBASE_MEASUREMENT_ID'),
     }
   },
   'js/github-api.js': {
@@ -75,8 +93,21 @@ function processFileContent(filePath, content) {
     Object.entries(replacements).forEach(([key, value]) => {
       const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       const regex = new RegExp(escapedKey, 'g');
+      
+      // Validate that the replacement value is a valid string
+      if (typeof value !== 'string') {
+        console.warn(`Warning: Replacement value for ${key} is not a string, using placeholder`);
+        return; // Skip this replacement
+      }
+      
       processedContent = processedContent.replace(regex, value);
     });
+    
+    // Basic syntax validation - check for common issues
+    if (processedContent.includes(': :') || processedContent.includes('undefined:')) {
+      console.error('Error: Invalid replacement detected in', relativePath);
+      console.error('This may cause syntax errors. Check environment variables.');
+    }
     
     return processedContent;
   }

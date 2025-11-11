@@ -33,29 +33,6 @@ jobs:
           npm audit --audit-level=moderate || true
           npm audit --json > audit-report.json || true
       
-      - name: Check for hardcoded secrets
-        run: |
-          echo "🔍 Scanning for hardcoded secrets..."
-          
-          # Check for Firebase API keys
-          if grep -r "AIzaSy" --include="*.js" --include="*.html" --exclude-dir=node_modules . | grep -v "VITE_FIREBASE_API_KEY" | grep -v ".env.example" | grep -v "SETUP.md" | grep -v "README.md" | grep -v "IMPROVEMENTS.md"; then
-            echo "❌ ERROR: Hardcoded Firebase API key detected!"
-            exit 1
-          fi
-          
-          # Check for GitHub tokens
-          if grep -r "ghp_\|gho_\|ghu_\|ghs_\|ghr_" --include="*.js" --include="*.html" --exclude-dir=node_modules . | grep -v "VITE_GITHUB_TOKEN" | grep -v ".env.example" | grep -v "SETUP.md" | grep -v "README.md" | grep -v "IMPROVEMENTS.md"; then
-            echo "❌ ERROR: Hardcoded GitHub token detected!"
-            exit 1
-          fi
-          
-          # Check for common password patterns
-          if grep -ri "password.*=.*['\"][^'\"]\{6,\}" --include="*.js" --exclude-dir=node_modules . | grep -v "VITE_" | grep -v ".env.example" | grep -v "//" | grep -v "password.*placeholder"; then
-            echo "⚠️  WARNING: Potential hardcoded password detected"
-          fi
-          
-          echo "✅ No hardcoded secrets found"
-      
       - name: Check for exposed environment variables
         run: |
           echo "🔍 Checking for exposed environment variables..."
@@ -72,6 +49,9 @@ jobs:
           fi
           
           echo "✅ Environment files properly ignored"
+          
+          # Note: Hardcoded secrets are checked in PR tests workflow
+          # This scan focuses on dependency vulnerabilities
       
       - name: Security Summary
         if: always()
@@ -82,8 +62,9 @@ jobs:
           echo ""
           echo "**Checks Performed:**"
           echo "- npm audit for dependency vulnerabilities"
-          echo "- Hardcoded secrets detection"
           echo "- Environment variable exposure check"
+          echo ""
+          echo "**Note:** Hardcoded secrets are checked in PR tests workflow"
           echo ""
           echo "**Next Steps:**"
           echo "- Review any warnings above"
