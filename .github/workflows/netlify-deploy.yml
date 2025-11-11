@@ -23,22 +23,26 @@ jobs:
             const prAuthor = context.payload.pull_request.user.login;
             
             if (context.payload.action === 'opened' || context.payload.action === 'synchronize') {
+              const commentBody = [
+                '## 🚀 Preview Deployment',
+                '',
+                'A preview deployment is being created automatically on Netlify.',
+                '',
+                '**Preview URL**: Will be available once Netlify finishes building (usually takes 1-2 minutes)',
+                '',
+                '**Note**:',
+                '- ✅ Preview deployments are automatic (no approval needed)',
+                '- ⏳ Production deployment will happen automatically after this PR is merged to `main`',
+                '- 🔒 Only merged PRs deploy to production',
+                '',
+                '**Status**: Netlify is building your preview...'
+              ].join('\n');
+              
               github.rest.issues.createComment({
                 issue_number: prNumber,
                 owner: context.repo.owner,
                 repo: context.repo.repo,
-                body: `## 🚀 Preview Deployment
-
-A preview deployment is being created automatically on Netlify.
-
-**Preview URL**: Will be available once Netlify finishes building (usually takes 1-2 minutes)
-
-**Note**: 
-- ✅ Preview deployments are automatic (no approval needed)
-- ⏳ Production deployment will happen automatically after this PR is merged to \`main\`
-- 🔒 Only merged PRs deploy to production
-
-**Status**: Netlify is building your preview...`
+                body: commentBody
               });
             }
       
