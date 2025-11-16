@@ -1,6 +1,6 @@
 // Form Submissions Module
-import { db, collection, doc, getDoc, getDocs, deleteDoc, query, orderBy, where, Timestamp } from '../firebase-config.js';
-import { showLoading, hideLoading, formatNumber } from './utils.js';
+import { db, collection, doc, getDoc, getDocs, deleteDoc, updateDoc, query, orderBy, where, Timestamp } from '../firebase-config.js';
+import { showLoading, hideLoading, formatNumber, showToast } from './utils.js';
 import { loadFormAnalytics } from './form-analytics.js';
 
 let currentFormId = null;
@@ -392,6 +392,9 @@ function renderSubmissionsTable(submissions = null) {
                             <button class="btn btn-sm btn-primary" onclick="viewSubmission('${submission.id}')">
                                 <i class="fas fa-eye"></i> View
                             </button>
+                            <button class="btn btn-sm btn-secondary" onclick="editSubmission('${submission.id}')">
+                                <i class="fas fa-edit"></i> Edit
+                            </button>
                             <button class="btn btn-sm btn-danger" onclick="deleteSubmission('${submission.id}')">
                                 <i class="fas fa-trash"></i> Delete
                             </button>
@@ -458,6 +461,12 @@ window.viewSubmission = function(submissionId) {
                     </div>
                 </div>
             </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="this.closest('.modal').remove()">Close</button>
+                <button class="btn btn-primary" onclick="editSubmission('${submission.id}'); this.closest('.modal').remove();">
+                    <i class="fas fa-edit"></i> Edit Submission
+                </button>
+            </div>
         </div>
     `;
 
@@ -467,6 +476,284 @@ window.viewSubmission = function(submissionId) {
             modal.remove();
         }
     });
+};
+
+/**
+ * Edit submission
+ */
+window.editSubmission = async function(submissionId) {
+    const submission = submissionsList.find(s => s.id === submissionId);
+    if (!submission) {
+        if (typeof showToast === 'function') {
+            showToast('Submission not found', 'error');
+        } else {
+            alert('Submission not found');
+        }
+        return;
+    }
+
+    // Create edit modal
+    const modal = document.createElement('div');
+    modal.className = 'modal';
+    modal.innerHTML = `
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h3>Edit Submission</h3>
+                <button class="btn-icon" onclick="this.closest('.modal').remove()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="submission-edit-form">
+                    <div class="form-section">
+                        <h4>Submission Information</h4>
+                        <div class="form-group">
+                            <label>Submitted By</label>
+                            <input type="text" id="editSubmittedBy" value="${escapeHtml(submission.submittedBy || '')}" placeholder="Email or name">
+                        </div>
+                        ${submission.completionTime !== undefined ? `
+                            <div class="form-group">
+                                <label>Completion Time (seconds)</label>
+                                <input type="number" id="editCompletionTime" value="${submission.completionTime || 0}" min="0">
+                            </div>
+                        ` : ''}
+                    </div>
+
+                    ${submission.userInfo && Object.keys(submission.userInfo).length > 0 ? `
+                        <div class="form-section">
+                            <h4>User Information</h4>
+                            ${Object.entries(submission.userInfo).map(([key, value]) => `
+                                <div class="form-group">
+                                    <label>${key.charAt(0).toUpperCase() + key.slice(1)}</label>
+                                    <input type="text" id="editUserInfo_${key}" value="${escapeHtml(value || '')}">
+                                </div>
+                            `).join('')}
+                        </div>
+                    ` : ''}
+
+                    <div class="form-section">
+                        <h4>Form Data</h4>
+                        <div id="editFormDataFields">
+                            ${renderEditableFormData(submission.data)}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="this.closest('.modal').remove()">Cancel</button>
+                <button class="btn btn-primary" onclick="saveSubmissionEdit('${submissionId}')">
+                    <i class="fas fa-save"></i> Save Changes
+                </button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            modal.remove();
+        }
+    });
+};
+
+/**
+ * Render editable form data fields
+ */
+function renderEditableFormData(data) {
+    if (!data || !currentFormData || !currentFormData.fields) {
+        return '<p>No form data available</p>';
+    }
+
+    return currentFormData.fields
+        .filter(field => field.type !== 'section' && field.type !== 'pagebreak')
+        .map(field => {
+            const fieldId = field.id;
+            const value = data[fieldId];
+            const fieldValue = value !== undefined && value !== null 
+                ? (Array.isArray(value) ? value.join(', ') : String(value))
+                : '';
+
+            let inputHtml = '';
+
+            switch (field.type) {
+                case 'text':
+                case 'email':
+                case 'number':
+                    inputHtml = `<input type="${field.type}" id="editField_${fieldId}" value="${escapeHtml(fieldValue)}" class="form-control">`;
+                    break;
+                case 'textarea':
+                    inputHtml = `<textarea id="editField_${fieldId}" rows="3" class="form-control">${escapeHtml(fieldValue)}</textarea>`;
+                    break;
+                case 'dropdown':
+                case 'radio':
+                    if (field.options && field.options.length > 0) {
+                        inputHtml = `
+                            <select id="editField_${fieldId}" class="form-control">
+                                <option value="">-- Select --</option>
+                                ${field.options.map(opt => `
+                                    <option value="${escapeHtml(opt)}" ${fieldValue === opt ? 'selected' : ''}>${escapeHtml(opt)}</option>
+                                `).join('')}
+                            </select>
+                        `;
+                    } else {
+                        inputHtml = `<input type="text" id="editField_${fieldId}" value="${escapeHtml(fieldValue)}" class="form-control">`;
+                    }
+                    break;
+                case 'multiselect':
+                case 'checkbox':
+                    if (field.options && field.options.length > 0) {
+                        const selectedValues = Array.isArray(value) ? value : (value ? [value] : []);
+                        inputHtml = `
+                            <div class="checkbox-group">
+                                ${field.options.map(opt => `
+                                    <label style="display: block; margin-bottom: 0.5rem;">
+                                        <input type="checkbox" value="${escapeHtml(opt)}" 
+                                               ${selectedValues.includes(opt) ? 'checked' : ''}
+                                               data-field-id="${fieldId}">
+                                        ${escapeHtml(opt)}
+                                    </label>
+                                `).join('')}
+                            </div>
+                        `;
+                    } else {
+                        inputHtml = `<input type="text" id="editField_${fieldId}" value="${escapeHtml(fieldValue)}" class="form-control">`;
+                    }
+                    break;
+                case 'date':
+                    const dateValue = fieldValue ? new Date(fieldValue).toISOString().split('T')[0] : '';
+                    inputHtml = `<input type="date" id="editField_${fieldId}" value="${dateValue}" class="form-control">`;
+                    break;
+                case 'time':
+                    const timeValue = fieldValue ? fieldValue.split(' ')[0] : '';
+                    inputHtml = `<input type="time" id="editField_${fieldId}" value="${timeValue}" class="form-control">`;
+                    break;
+                default:
+                    inputHtml = `<input type="text" id="editField_${fieldId}" value="${escapeHtml(fieldValue)}" class="form-control">`;
+            }
+
+            return `
+                <div class="form-group">
+                    <label>
+                        ${escapeHtml(field.label || 'Untitled Field')}
+                        ${field.required ? '<span class="required">*</span>' : ''}
+                    </label>
+                    ${inputHtml}
+                    ${field.helpText ? `<small class="form-help-text">${escapeHtml(field.helpText)}</small>` : ''}
+                </div>
+            `;
+        }).join('');
+}
+
+/**
+ * Save submission edit
+ */
+window.saveSubmissionEdit = async function(submissionId) {
+    try {
+        showLoading();
+
+        // Get edited values
+        const submittedBy = document.getElementById('editSubmittedBy')?.value || '';
+        const completionTime = document.getElementById('editCompletionTime')?.value 
+            ? parseInt(document.getElementById('editCompletionTime').value) 
+            : undefined;
+
+        // Get user info
+        const userInfo = {};
+        if (currentFormData && submissionsList.find(s => s.id === submissionId)?.userInfo) {
+            const originalUserInfo = submissionsList.find(s => s.id === submissionId).userInfo;
+            Object.keys(originalUserInfo).forEach(key => {
+                const input = document.getElementById(`editUserInfo_${key}`);
+                if (input) {
+                    userInfo[key] = input.value;
+                }
+            });
+        }
+
+        // Get form data
+        const editedData = {};
+        if (currentFormData && currentFormData.fields) {
+            currentFormData.fields
+                .filter(field => field.type !== 'section' && field.type !== 'pagebreak')
+                .forEach(field => {
+                    const fieldId = field.id;
+                    let fieldValue = null;
+
+                    if (field.type === 'multiselect' || field.type === 'checkbox') {
+                        // Get all checked values
+                        const checkboxes = document.querySelectorAll(`input[type="checkbox"][data-field-id="${fieldId}"]:checked`);
+                        fieldValue = Array.from(checkboxes).map(cb => cb.value);
+                        if (fieldValue.length === 0) fieldValue = null;
+                    } else {
+                        const input = document.getElementById(`editField_${fieldId}`);
+                        if (input) {
+                            fieldValue = input.value;
+                            if (fieldValue === '' && !field.required) {
+                                fieldValue = null;
+                            }
+                        }
+                    }
+
+                    if (fieldValue !== null) {
+                        editedData[fieldId] = fieldValue;
+                    }
+                });
+        }
+
+        // Prepare update data
+        const updateData = {
+            data: editedData,
+            updatedAt: Timestamp.now()
+        };
+
+        if (submittedBy !== '') {
+            updateData.submittedBy = submittedBy;
+        }
+
+        if (completionTime !== undefined) {
+            updateData.completionTime = completionTime;
+        }
+
+        if (Object.keys(userInfo).length > 0) {
+            updateData.userInfo = userInfo;
+        }
+
+        // Update in Firebase
+        const submissionRef = doc(db, 'form_submissions', currentFormId, 'submissions', submissionId);
+        await updateDoc(submissionRef, updateData);
+
+        // Reload submissions
+        await loadSubmissions();
+
+        // Re-render the page
+        renderFormDetails();
+
+        // Reload analytics
+        if (typeof loadFormAnalytics === 'function') {
+            loadFormAnalytics(currentFormId, currentFormData);
+        }
+
+        // Close modal
+        const modal = document.querySelector('.modal');
+        if (modal) {
+            modal.remove();
+        }
+
+        if (typeof showToast === 'function') {
+            showToast('Submission updated successfully!', 'success');
+        } else {
+            alert('Submission updated successfully!');
+        }
+    } catch (error) {
+        console.error('Error updating submission:', error);
+        const errorMsg = error.message || 'Failed to update submission';
+        if (typeof showToast === 'function') {
+            showToast(`Error: ${errorMsg}`, 'error');
+        } else {
+            alert(`Failed to update submission: ${errorMsg}`);
+        }
+    } finally {
+        hideLoading();
+    }
 };
 
 /**
@@ -494,19 +781,42 @@ function renderSubmissionData(data) {
  * Delete submission
  */
 window.deleteSubmission = async function(submissionId) {
-    if (!confirm('Are you sure you want to delete this submission?')) return;
+    if (!confirm('Are you sure you want to delete this submission? This action cannot be undone.')) return;
 
     try {
         showLoading();
+        
+        // Delete from Firebase - correct path: form_submissions/{formId}/submissions/{submissionId}
         const submissionRef = doc(db, 'form_submissions', currentFormId, 'submissions', submissionId);
         await deleteDoc(submissionRef);
         
+        // Remove from local list
         submissionsList = submissionsList.filter(s => s.id !== submissionId);
+        
+        // Reload submissions to ensure sync
+        await loadSubmissions();
+        
+        // Re-render the page
         renderFormDetails();
-        showSuccess('Submission deleted successfully');
+        
+        // Reload analytics
+        if (typeof loadFormAnalytics === 'function') {
+            loadFormAnalytics(currentFormId, currentFormData);
+        }
+        
+        if (typeof showToast === 'function') {
+            showToast('Submission deleted successfully!', 'success');
+        } else {
+            alert('Submission deleted successfully!');
+        }
     } catch (error) {
         console.error('Error deleting submission:', error);
-        alert('Failed to delete submission');
+        const errorMsg = error.message || 'Failed to delete submission';
+        if (typeof showToast === 'function') {
+            showToast(`Error: ${errorMsg}`, 'error');
+        } else {
+            alert(`Failed to delete submission: ${errorMsg}`);
+        }
     } finally {
         hideLoading();
     }
